@@ -392,6 +392,21 @@
         {% endif %}
       </div>
     </div>
+    <div class="card">
+      <div class="label">{{ t.card_month_delta }}</div>
+      <div class="value">
+        {% if summary.monthly_added is not none %}
+          <span class="delta-add">+{{ summary.monthly_added }}</span>
+          <span class="delta-rem">−{{ summary.monthly_removed }}</span>
+        {% else %}
+          <small>{{ t.card_month_na }}</small>
+        {% endif %}
+      </div>
+    </div>
+    <button class="card card-btn" data-days="7">
+      <div class="label">{{ t.card_expiring_7 }}</div>
+      <div class="value">{{ summary.expiring_7 }}</div>
+    </button>
     <button class="card card-btn" data-days="30">
       <div class="label">{{ t.card_expiring_30 }}</div>
       <div class="value">{{ summary.expiring_30 }}</div>
@@ -448,6 +463,7 @@
     <a href="/api/summary">API</a> ·
     <a href="/api/expiring?days=30">{{ t.footer_expiring }}</a> ·
     {{ t.footer_data }} <a href="https://data.ctu.gov.cz/dataset/individualni-opravneni-volaci-znacky-stanic-amaterske-sluzby">data.ctu.gov.cz</a> ·
+    open source · <a href="https://github.com/michalsiman/ctu-ham-stats" target="_blank" rel="noopener">GitHub</a> ·
     Autor: Michal Šiman OK1SIM
   </footer>
 

@@ -69,12 +69,38 @@ def test_expiring_uses_max_validity_per_callsign(conn, monkeypatch):
     assert [r["callsign"] for r in listed] == ["OK1AAA"]
 
 
-def test_summary(conn):
-    store_snapshot(conn, load("sample_day1.csv"), date(2026, 8, 1))
-    store_snapshot(conn, load("sample_day2.csv"), date(2026, 8, 2))
+def test_summary(conn, monkeypatch):
+    store_snapshot(conn, [
+        ("OK1A", 1, "2030-01-31"),
+        ("OK1B", 2, "2030-01-31"),
+        ("OK1C", 3, "2030-01-31"),
+    ], date(2026, 6, 30))
+    store_snapshot(conn, [
+        ("OK1A", 1, "2030-01-31"),
+        ("OK1C", 3, "2030-01-31"),
+        ("OK1D", 4, "2030-01-31"),
+    ], date(2026, 7, 31))
+    store_snapshot(conn, [
+        ("OK1A", 1, "2030-01-31"),
+        ("OK1C", 3, "2030-01-31"),
+        ("OK1D", 4, "2030-01-31"),
+        ("OK1E", 5, "2026-08-10"),
+        ("OK1F", 6, "2026-08-20"),
+    ], date(2026, 8, 2))
+
+    from app import stats as stats_module
+    class FakeDate(date):
+        @classmethod
+        def today(cls):
+            return cls(2026, 8, 4)
+
+    monkeypatch.setattr(stats_module, "date", FakeDate)
     s = stats.summary(conn)
     assert s["snapshot_date"] == "2026-08-02"
     assert s["unique_callsigns"] == 5
+    assert s["expiring_7"] == 1
+    assert s["monthly_added"] == 1
+    assert s["monthly_removed"] == 1
 
 
 def test_callsign_lookup_states(conn, monkeypatch):

@@ -10,6 +10,62 @@ def latest_snapshot(conn: sqlite3.Connection) -> str | None:
     return row["snapshot_date"] if row else None
 
 
+def _previous_month_start(current_month_start: date) -> date:
+    if current_month_start.month == 1:
+        return date(current_month_start.year - 1, 12, 1)
+    return date(current_month_start.year, current_month_start.month - 1, 1)
+
+
+def _latest_snapshot_in_range(
+    conn: sqlite3.Connection, start: date, end: date
+) -> str | None:
+    row = conn.execute(
+        """
+        SELECT snapshot_date
+        FROM daily_stats
+        WHERE snapshot_date >= ? AND snapshot_date < ?
+        ORDER BY snapshot_date DESC
+        LIMIT 1
+        """,
+        (start.isoformat(), end.isoformat()),
+    ).fetchone()
+    return row["snapshot_date"] if row else None
+
+
+def _row_delta_between_snapshots(
+    conn: sqlite3.Connection, newer_snapshot: str, older_snapshot: str
+) -> tuple[int, int]:
+    added = conn.execute(
+        """
+        SELECT COUNT(*) AS n FROM (
+            SELECT callsign, reference, valid_until
+            FROM licenses
+            WHERE last_seen = ?
+            EXCEPT
+            SELECT callsign, reference, valid_until
+            FROM licenses
+            WHERE last_seen = ?
+        )
+        """,
+        (newer_snapshot, older_snapshot),
+    ).fetchone()["n"]
+    removed = conn.execute(
+        """
+        SELECT COUNT(*) AS n FROM (
+            SELECT callsign, reference, valid_until
+            FROM licenses
+            WHERE last_seen = ?
+            EXCEPT
+            SELECT callsign, reference, valid_until
+            FROM licenses
+            WHERE last_seen = ?
+        )
+        """,
+        (older_snapshot, newer_snapshot),
+    ).fetchone()["n"]
+    return added, removed
+
+
 def summary(conn: sqlite3.Connection) -> dict | None:
     """Aktuální stav: počty + dnešní přírůstek/úbytek + expirace."""
     latest = latest_snapshot(conn)
@@ -18,6 +74,7 @@ def summary(conn: sqlite3.Connection) -> dict | None:
     stats = conn.execute(
         "SELECT * FROM daily_stats WHERE snapshot_date = ?", (latest,)
     ).fetchone()
+    monthly = monthly_change(conn)
     return {
         "snapshot_date": latest,
         "fetched_at": stats["fetched_at"],
@@ -25,8 +82,11 @@ def summary(conn: sqlite3.Connection) -> dict | None:
         "unique_callsigns": stats["unique_callsigns"],
         "added": stats["added"],
         "removed": stats["removed"],
+        "expiring_7": expiring_count(conn, 7),
         "expiring_30": expiring_count(conn, 30),
         "expiring_90": expiring_count(conn, 90),
+        "monthly_added": monthly["added"] if monthly else None,
+        "monthly_removed": monthly["removed"] if monthly else None,
         "unattended": len(station_list(conn, "unattended")),
         "special": len(station_list(conn, "special")),
         "clubs": len(station_list(conn, "club")),
@@ -56,6 +116,32 @@ def expiring_count(conn: sqlite3.Connection, days: int) -> int | None:
         (latest, today, horizon),
     ).fetchone()
     return row["n"]
+
+
+def monthly_change(conn: sqlite3.Connection) -> dict | None:
+    """Změna mezi dvěma posledními kompletními měsíci podle koncových snapshotů."""
+    if not latest_snapshot(conn):
+        return None
+
+    today = date.today()
+    current_month_start = date(today.year, today.month, 1)
+    prev_month_start = _previous_month_start(current_month_start)
+    before_prev_month_start = _previous_month_start(prev_month_start)
+
+    newer_snapshot = _latest_snapshot_in_range(conn, prev_month_start, current_month_start)
+    older_snapshot = _latest_snapshot_in_range(
+        conn, before_prev_month_start, prev_month_start
+    )
+    if not newer_snapshot or not older_snapshot:
+        return None
+
+    added, removed = _row_delta_between_snapshots(conn, newer_snapshot, older_snapshot)
+    return {
+        "snapshot_date": newer_snapshot,
+        "compare_to": older_snapshot,
+        "added": added,
+        "removed": removed,
+    }
 
 
 def expiring_list(conn: sqlite3.Connection, days: int, limit: int = 500) -> list[dict]:
