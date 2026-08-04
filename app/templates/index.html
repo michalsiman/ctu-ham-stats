@@ -418,8 +418,8 @@
           .map(([label, href]) => `<a href="${href}" target="_blank" rel="noopener">${label}</a>`)
           .join(" · ");
         box.innerHTML = `<div class="cs">${d.callsign}${badge}</div>
-                         <div class="detail">${detail}</div>${cnt}
-                         <div class="links"><span>${T.res_external}</span> ${ctuForm} ${links}</div>`;
+             <div class="detail">${detail}</div>${cnt}
+             <div class="links"><span>${T.res_external}</span> · ${ctuForm} · ${links}</div>`;
       } catch {
         box.textContent = T.res_error;
       }
