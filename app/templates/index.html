@@ -142,6 +142,33 @@
     border-radius: 6px;
     padding: 16px;
   }
+  .breakdown {
+    display: grid;
+    grid-template-columns: 3fr 2fr;
+    gap: 12px;
+    margin-top: 12px;
+    align-items: stretch;
+  }
+  .breakdown .chart-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 270px;
+  }
+  .breakdown .chart-panel canvas {
+    flex: 1;
+    width: 100% !important;
+  }
+  .breakdown .panel-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    min-height: 2.7em;
+  }
+  .breakdown .panel-title .totals {
+    float: none;
+    text-align: right;
+  }
   .empty {
     margin: 48px auto;
     text-align: center;
@@ -258,13 +285,10 @@
   }
   .cs-item small { display: block; color: var(--muted); font-family: inherit; font-size: .72rem; }
   .cs-item:hover { border-color: var(--lcd-dim); }
-  .breakdown {
-    display: grid;
-    grid-template-columns: 3fr 2fr;
-    gap: 12px;
-    margin-top: 12px;
+  @media (max-width: 720px) {
+    .breakdown { grid-template-columns: 1fr; }
+    .breakdown .chart-panel { min-height: 0; }
   }
-  @media (max-width: 720px) { .breakdown { grid-template-columns: 1fr; } }
   .panel-title {
     font-size: .8rem;
     text-transform: uppercase;
