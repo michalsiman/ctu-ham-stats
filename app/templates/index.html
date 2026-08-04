@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ t.title }}</title>
+<script src="/static/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #14161a;
+    --panel: #1c2026;
+    --panel-edge: #2a2f37;
+    --lcd: #ffb454;          /* jantarový displej transceiveru */
+    --lcd-dim: #8a6430;
+    --text: #c9ccd1;
+    --muted: #7d828a;
+    --ok: #7dc47d;
+    --warn: #e0705a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+  header h1 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    margin: 0;
+  }
+  header .sub { color: var(--muted); font-size: .85rem; margin-top: 2px; }
+  .head-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .langs { display: flex; gap: 4px; flex-shrink: 0; }
+  .head-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  .freshness {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: .78rem;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 999px;
+    padding: 5px 12px 5px 10px;
+    white-space: nowrap;
+  }
+  .freshness .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--ok);
+    box-shadow: 0 0 8px var(--ok);
+    flex-shrink: 0;
+  }
+  .freshness.stale .dot { background: var(--lcd); box-shadow: 0 0 8px var(--lcd); }
+  .freshness.stale { border-color: var(--lcd-dim); }
+  .freshness.old .dot { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+  .freshness.old { border-color: var(--warn); color: var(--warn); }
+  @media (max-width: 640px) {
+    .head-row { flex-direction: column; align-items: stretch; }
+    .head-right { align-items: flex-start; }
+  }
+  .langs a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: .75rem;
+    letter-spacing: .06em;
+    padding: 4px 8px;
+    border: 1px solid var(--panel-edge);
+    border-radius: 4px;
+    background: var(--panel);
+  }
+  .langs a:hover { color: var(--lcd); border-color: var(--lcd-dim); }
+  .langs a.active { color: var(--lcd); border-color: var(--lcd-dim); background: #101317; }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin: 24px 0;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 6px;
+    padding: 14px 16px;
+  }
+  .card .label {
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--muted);
+  }
+  .card .value {
+    font-family: "Consolas", "DejaVu Sans Mono", monospace;
+    font-size: 2rem;
+    color: var(--lcd);
+    text-shadow: 0 0 12px rgba(255, 180, 84, .35);
+    margin-top: 4px;
+  }
+  .card .value small { font-size: .9rem; color: var(--lcd-dim); }
+  .delta-add { color: var(--ok); }
+  .delta-rem { color: var(--warn); }
+  .chart-panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 6px;
+    padding: 16px;
+  }
+  .empty {
+    margin: 48px auto;
+    text-align: center;
+    color: var(--muted);
+  }
+  .empty code { color: var(--lcd); }
+  .search {
+    display: flex;
+    gap: 8px;
+    margin-top: 20px;
+  }
+  .search input {
+    flex: 1;
+    max-width: 280px;
+    background: #101317;
+    border: 1px solid var(--panel-edge);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--lcd);
+    font-family: "Consolas", "DejaVu Sans Mono", monospace;
+    font-size: 1.05rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .search input:focus { outline: 2px solid var(--lcd-dim); }
+  .search button {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 10px 18px;
+    font-size: .9rem;
+    cursor: pointer;
+  }
+  .search button:hover { border-color: var(--lcd-dim); color: var(--lcd); }
+  .result {
+    margin-top: 12px;
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 6px;
+    padding: 14px 16px;
+    display: none;
+  }
+  .result .cs {
+    font-family: "Consolas", "DejaVu Sans Mono", monospace;
+    font-size: 1.4rem;
+    color: var(--lcd);
+    letter-spacing: .06em;
+  }
+  .badge {
+    display: inline-block;
+    font-size: .72rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    border-radius: 4px;
+    padding: 3px 8px;
+    margin-left: 10px;
+    vertical-align: middle;
+  }
+  .badge.active { background: rgba(125,196,125,.15); color: var(--ok); border: 1px solid var(--ok); }
+  .badge.gone   { background: rgba(224,112,90,.12);  color: var(--warn); border: 1px solid var(--warn); }
+  .badge.none   { background: rgba(125,130,138,.12); color: var(--muted); border: 1px solid var(--muted); }
+  .result .detail { margin-top: 8px; font-size: .9rem; color: var(--text); }
+  .result .detail span { color: var(--muted); }
+  .card-btn {
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+    transition: border-color .15s;
+  }
+  .card-btn:hover, .card-btn.open { border-color: var(--lcd-dim); }
+  .card-btn.open .label::after { content: " ▾"; color: var(--lcd); }
+  .expiring-panel {
+    display: none;
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 24px;
+  }
+  .panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .panel-head button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1rem;
+  }
+  .panel-head button:hover { color: var(--lcd); }
+  .cs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 6px;
+  }
+  .cs-item {
+    background: #101317;
+    border: 1px solid var(--panel-edge);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-family: "Consolas", "DejaVu Sans Mono", monospace;
+    color: var(--lcd);
+    font-size: .95rem;
+    cursor: pointer;
+    text-align: left;
+  }
+  .cs-item small { display: block; color: var(--muted); font-family: inherit; font-size: .72rem; }
+  .cs-item:hover { border-color: var(--lcd-dim); }
+  .breakdown {
+    display: grid;
+    grid-template-columns: 3fr 2fr;
+    gap: 12px;
+    margin-top: 12px;
+  }
+  @media (max-width: 720px) { .breakdown { grid-template-columns: 1fr; } }
+  .panel-title {
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .panel-title .totals { float: right; color: var(--lcd-dim); text-transform: none; letter-spacing: normal; }
+  footer { margin-top: 32px; font-size: .78rem; color: var(--muted); }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="head-row">
+      <div>
+        <h1>{{ t.title | upper }}</h1>
+        <div class="sub">{{ t.subtitle }}</div>
+      </div>
+      <div class="head-right">
+        <nav class="langs" aria-label="{{ t.lang_label }}">
+          {%- for code, name in languages.items() %}
+          <a href="?lang={{ code }}" title="{{ name }}"
+             class="{{ 'active' if code == lang }}">{{ code | upper }}</a>
+          {%- endfor %}
+        </nav>
+        {% if summary %}
+        <div class="freshness" id="freshness" data-iso="{{ summary.fetched_at or '' }}">
+          <span class="dot"></span>
+          <span class="txt">{{ t.footer_never }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <form class="search" id="searchForm">
+    <input id="searchInput" placeholder="{{ t.search_placeholder }}" maxlength="16"
+           autocomplete="off" spellcheck="false" aria-label="{{ t.search_label }}">
+    <button type="submit">{{ t.search_button }}</button>
+  </form>
+  <div class="result" id="searchResult"></div>
+
+  <script>
+    const T = {{ t | tojson }};
+    const form = document.getElementById("searchForm");
+    const box = document.getElementById("searchResult");
+    const LANG = {{ lang | tojson }};
+    const fmt = iso => iso
+      ? new Date(iso + "T00:00:00").toLocaleDateString(LANG, { day: "2-digit", month: "2-digit", year: "numeric" })
+      : "";
+
+    form.addEventListener("submit", async e => {
+      e.preventDefault();
+      const q = document.getElementById("searchInput").value.trim().toUpperCase();
+      if (!q) return;
+      box.style.display = "block";
+      box.textContent = T.res_searching;
+      try {
+        const r = await fetch("/api/callsign/" + encodeURIComponent(q));
+        const d = await r.json();
+        let badge, detail;
+        if (d.status === "active") {
+          badge = `<span class="badge active">${T.status_active}</span>`;
+          detail = `<span>${T.res_valid_until}</span> ${fmt(d.valid_until)} <span>${T.res_in_days.replace("{days}", d.expires_in_days)}</span>`;
+        } else if (d.status === "lapsed") {
+          badge = `<span class="badge gone">${T.status_lapsed}</span>`;
+          detail = `<span>${T.res_expired_on}</span> ${fmt(d.valid_until)}`;
+        } else if (d.status === "historical") {
+          badge = `<span class="badge gone">${T.status_historical}</span>`;
+          detail = `<span>${T.res_existed}</span> ${fmt(d.valid_until)},
+                    <span>${T.res_last_seen}</span> ${fmt(d.last_seen)}`;
+        } else {
+          badge = `<span class="badge none">${T.status_not_found}</span>`;
+          detail = `<span>${T.res_not_found}</span>`;
+        }
+        const cnt = d.records ? `<div class="detail"><span>${T.res_records}</span> ${d.records.length}</div>` : "";
+        box.innerHTML = `<div class="cs">${d.callsign}${badge}</div>
+                         <div class="detail">${detail}</div>${cnt}`;
+      } catch {
+        box.textContent = T.res_error;
+      }
+    });
+  </script>
+
+  {% if summary %}
+  <section class="cards">
+    <div class="card">
+      <div class="label">{{ t.card_total_rows }}</div>
+      <div class="value">{{ summary.total_rows }}</div>
+    </div>
+    <div class="card">
+      <div class="label">{{ t.card_unique }}</div>
+      <div class="value">{{ summary.unique_callsigns }}</div>
+    </div>
+    <div class="card">
+      <div class="label">{{ t.card_delta }}</div>
+      <div class="value">
+        {% if summary.added is not none %}
+          <span class="delta-add">+{{ summary.added }}</span>
+          <span class="delta-rem">−{{ summary.removed }}</span>
+        {% else %}
+          <small>{{ t.card_first_snapshot }}</small>
+        {% endif %}
+      </div>
+    </div>
+    <button class="card card-btn" data-days="30">
+      <div class="label">{{ t.card_expiring_30 }}</div>
+      <div class="value">{{ summary.expiring_30 }}</div>
+    </button>
+    <button class="card card-btn" data-days="90">
+      <div class="label">{{ t.card_expiring_90 }}</div>
+      <div class="value">{{ summary.expiring_90 }}</div>
+    </button>
+    <button class="card card-btn" data-kind="unattended">
+      <div class="label">{{ t.card_unattended }}</div>
+      <div class="value">{{ summary.unattended }}</div>
+    </button>
+    <button class="card card-btn" data-kind="special">
+      <div class="label">{{ t.card_special }}</div>
+      <div class="value">{{ summary.special }}</div>
+    </button>
+    <button class="card card-btn" data-kind="club">
+      <div class="label">{{ t.card_clubs }}</div>
+      <div class="value">{{ summary.clubs }}</div>
+    </button>
+  </section>
+
+  <section class="expiring-panel" id="expiringPanel">
+    <div class="panel-head">
+      <span id="expiringTitle"></span>
+      <button type="button" id="expiringClose" aria-label="{{ t.panel_close }}">✕</button>
+    </div>
+    <div class="cs-grid" id="expiringGrid"></div>
+  </section>
+
+  <section class="chart-panel">
+    <canvas id="dailyChart" height="110"></canvas>
+  </section>
+
+  {% if breakdown %}
+  <section class="breakdown">
+    <div class="chart-panel">
+      <div class="panel-title">{{ t.chart_prefix }}
+        <span class="totals">
+          {%- for p, n in breakdown.prefixes.items() %} {{ p }}: {{ n }}{% if not loop.last %} ·{% endif %}{% endfor -%}
+        </span>
+      </div>
+      <canvas id="prefixChart" height="170"></canvas>
+    </div>
+    <div class="chart-panel">
+      <div class="panel-title">{{ t.chart_suffix }}</div>
+      <canvas id="suffixChart" height="170"></canvas>
+    </div>
+  </section>
+  {% endif %}
+
+  <footer>
+    {{ t.footer_snapshot }} {{ summary.snapshot_date }} ·
+    <a href="/api/summary">API</a> ·
+    <a href="/api/expiring?days=30">{{ t.footer_expiring }}</a> ·
+    {{ t.footer_data }} <a href="https://data.ctu.gov.cz/dataset/individualni-opravneni-volaci-znacky-stanic-amaterske-sluzby">data.ctu.gov.cz</a>
+  </footer>
+
+  <script>
+    // Klikací karty expirace → abecední seznam značek
+    const panel = document.getElementById("expiringPanel");
+    const grid = document.getElementById("expiringGrid");
+    const title = document.getElementById("expiringTitle");
+    const cardBtns = document.querySelectorAll(".card-btn");
+    const KIND_TITLES = {
+      unattended: T.panel_unattended,
+      special: T.panel_special,
+      club: T.panel_club,
+    };
+    let openKey = null;
+
+    function closePanel() {
+      panel.style.display = "none";
+      openKey = null;
+      cardBtns.forEach(b => b.classList.remove("open"));
+    }
+    document.getElementById("expiringClose").addEventListener("click", closePanel);
+
+    cardBtns.forEach(btn => btn.addEventListener("click", async () => {
+      const days = btn.dataset.days, kind = btn.dataset.kind;
+      const key = days ?? kind;
+      if (openKey === key) { closePanel(); return; }
+      cardBtns.forEach(b => b.classList.toggle("open", b === btn));
+      title.textContent = T.panel_loading;
+      grid.innerHTML = "";
+      panel.style.display = "block";
+      openKey = key;
+      try {
+        const url = days ? "/api/expiring?days=" + days : "/api/stations?kind=" + kind;
+        const d = await (await fetch(url)).json();
+        const list = [...d.callsigns].sort((a, b) => a.callsign.localeCompare(b.callsign));
+        title.textContent = days
+          ? T.panel_expiring.replace("{days}", days).replace("{count}", d.count)
+          : KIND_TITLES[kind].replace("{count}", d.count);
+        grid.innerHTML = list.map(x =>
+          `<button type="button" class="cs-item" data-cs="${x.callsign}">
+             ${x.callsign}<small>${T.until} ${fmt(x.valid_until)}</small>
+           </button>`).join("");
+        grid.querySelectorAll(".cs-item").forEach(el => el.addEventListener("click", () => {
+          document.getElementById("searchInput").value = el.dataset.cs;
+          form.requestSubmit();
+          box.scrollIntoView({ behavior: "smooth", block: "center" });
+        }));
+      } catch {
+        title.textContent = T.panel_error;
+      }
+    }));
+  </script>
+
+  <script>
+    // čas posledního úspěšného stažení a zpracování dat (uloženo v UTC)
+    const freshEl = document.getElementById("freshness");
+    function renderFreshness() {
+      const iso = freshEl?.dataset.iso;
+      if (!iso) return;
+      const when = new Date(iso);
+      const mins = Math.round((Date.now() - when) / 60000);
+      const rel = new Intl.RelativeTimeFormat(LANG, { numeric: "auto" });
+      const ago = mins < 60 ? rel.format(-mins, "minute")
+                : mins < 1440 ? rel.format(-Math.round(mins / 60), "hour")
+                : rel.format(-Math.round(mins / 1440), "day");
+      const stamp = when.toLocaleString(LANG, {
+        day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit",
+      });
+      freshEl.querySelector(".txt").textContent = `${T.footer_updated} ${stamp} · ${ago}`;
+      // barva: čerstvá do 12 h, zestárlá do 36 h, pak varování
+      freshEl.classList.toggle("stale", mins > 720 && mins <= 2160);
+      freshEl.classList.toggle("old", mins > 2160);
+      freshEl.title = when.toISOString();
+    }
+    renderFreshness();
+    setInterval(renderFreshness, 60000);  // ať relativní čas neztuhne
+
+    const series = {{ series | tojson }};
+    new Chart(document.getElementById("dailyChart"), {
+      type: "line",
+      data: {
+        labels: series.map(d => d.snapshot_date),
+        datasets: [{
+          label: T.chart_daily,
+          data: series.map(d => d.unique_callsigns),
+          borderColor: "#ffb454",
+          backgroundColor: "rgba(255,180,84,.12)",
+          fill: true,
+          tension: .25,
+          pointRadius: series.length > 60 ? 0 : 3,
+        }]
+      },
+      options: {
+        plugins: { legend: { labels: { color: "#c9ccd1" } } },
+        scales: {
+          x: { ticks: { color: "#7d828a", maxTicksLimit: 12 }, grid: { color: "#2a2f37" } },
+          y: { ticks: { color: "#7d828a" }, grid: { color: "#2a2f37" } }
+        }
+      }
+    });
+
+    {% if breakdown %}
+    const bd = {{ breakdown | tojson }};
+    const axis = { ticks: { color: "#7d828a" }, grid: { color: "#2a2f37" } };
+    const OK_COLOR = "rgba(255,180,84,.75)", OL_COLOR = "rgba(125,196,125,.75)";
+
+    // sjednocené popisky os z OK i OL, číselně seřazené
+    function unionKeys(a, b, numeric) {
+      const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])];
+      return keys.sort((x, y) => numeric ? Number(x) - Number(y) : x.localeCompare(y));
+    }
+
+    // plugin: malým písmem vypíše hodnotu jen nad sloupci, které jsou
+    // příliš nízké na odečtení z osy (velké sloupce nechává čisté)
+    const valueLabels = {
+      id: "valueLabels",
+      afterDatasetsDraw(chart) {
+        const { ctx, chartArea } = chart;
+        ctx.save();
+        ctx.font = "9px Consolas, monospace";
+        ctx.textAlign = "center";
+        chart.data.datasets.forEach((ds, i) => {
+          const meta = chart.getDatasetMeta(i);
+          if (meta.hidden) return;
+          ctx.fillStyle = i === 0 ? "#ffb454" : "#7dc47d";
+          meta.data.forEach((bar, j) => {
+            const v = ds.data[j];
+            const barHeight = chartArea.bottom - bar.y;
+            if (v > 0 && barHeight < 14) ctx.fillText(v, bar.x, bar.y - 3);
+          });
+        });
+        ctx.restore();
+      }
+    };
+
+    function dualAxisBar(canvasId, okData, olData, labels, showValues = false) {
+      new Chart(document.getElementById(canvasId), {
+        type: "bar",
+        plugins: showValues ? [valueLabels] : [],
+        data: {
+          labels,
+          datasets: [
+            { label: T.axis_ok, data: labels.map(k => okData[k] ?? 0),
+              backgroundColor: OK_COLOR, yAxisID: "yOK" },
+            { label: T.axis_ol, data: labels.map(k => olData[k] ?? 0),
+              backgroundColor: OL_COLOR, yAxisID: "yOL" },
+          ]
+        },
+        options: {
+          plugins: { legend: { labels: { color: "#c9ccd1" } } },
+          layout: { padding: { top: 16 } },
+          scales: {
+            x: axis,
+            yOK: { ...axis, position: "left", grace: "8%",
+                   ticks: { ...axis.ticks, color: "#ffb454" } },
+            yOL: { ...axis, position: "right", grace: "8%",
+                   grid: { drawOnChartArea: false },
+                   ticks: { ...axis.ticks, color: "#7dc47d" } },
+          }
+        }
+      });
+    }
+
+    dualAxisBar("prefixChart", bd.prefix_digit.OK, bd.prefix_digit.OL,
+                unionKeys(bd.prefix_digit.OK, bd.prefix_digit.OL, true));
+    dualAxisBar("suffixChart", bd.suffix_length.OK, bd.suffix_length.OL,
+                unionKeys(bd.suffix_length.OK, bd.suffix_length.OL, true), true);
+    {% endif %}
+  </script>
+  {% else %}
+  <div class="empty">
+    <p>{{ t.empty_title }}</p>
+    <p>{{ t.empty_hint }} <code>python -m app.ingest</code><br>
+       nebo <code>curl -X POST http://localhost:8000/api/ingest</code></p>
+  </div>
+  {% endif %}
+</div>
+</body>
+</html>

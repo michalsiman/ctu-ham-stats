@@ -1,0 +1,18 @@
+services:
+  ham-stats:
+    build: .
+    container_name: ctu-ham-stats
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./data:/srv/data
+    environment:
+      - TZ=Europe/Prague
+      # časy stahování dat ČTÚ (data se během dne mění)
+      - INGEST_TIMES=06:00,14:00
+    # Pro nasazení za Traefikem místo ports použij labels, např.:
+    # labels:
+    #   - traefik.enable=true
+    #   - traefik.http.routers.hamstats.rule=Host(`stats.ok1sim.cz`)
+    #   - traefik.http.routers.hamstats.tls.certresolver=cloudflare
