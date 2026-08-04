@@ -237,6 +237,31 @@
   .badge.none   { background: rgba(125,130,138,.12); color: var(--muted); border: 1px solid var(--muted); }
   .result .detail { margin-top: 8px; font-size: .9rem; color: var(--text); }
   .result .detail span { color: var(--muted); }
+  .result .links {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    font-size: .85rem;
+  }
+  .result .links span { color: var(--muted); }
+  .result .links a {
+    color: var(--lcd);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+  }
+  .result .links a:hover { border-bottom-color: var(--lcd); }
+  .result .links form { display: inline; margin: 0; }
+  .result .links button {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--lcd);
+    font: inherit;
+    cursor: pointer;
+    border-bottom: 1px solid transparent;
+  }
+  .result .links button:hover { border-bottom-color: var(--lcd); }
   .card-btn {
     text-align: left;
     font: inherit;
@@ -345,6 +370,20 @@
     const fmt = iso => iso
       ? new Date(iso + "T00:00:00").toLocaleDateString(LANG, { day: "2-digit", month: "2-digit", year: "numeric" })
       : "";
+    const esc = s => String(s).replace(/[&<>'"]/g, ch => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      "'": "&#39;",
+      '"': "&quot;",
+    }[ch]));
+    const ctuSearchPath = LANG === "en"
+      ? "https://ctu.gov.cz/en/search"
+      : "https://ctu.gov.cz/vyhledavani";
+    const externalLinks = callsign => [
+      ["QRZ.com", `https://www.qrz.com/db/${encodeURIComponent(callsign)}`],
+      ["HamQTH", `https://www.hamqth.com/search.php?callsign=${encodeURIComponent(callsign)}`],
+    ];
 
     form.addEventListener("submit", async e => {
       e.preventDefault();
@@ -371,8 +410,16 @@
           detail = `<span>${T.res_not_found}</span>`;
         }
         const cnt = d.records ? `<div class="detail"><span>${T.res_records}</span> ${d.records.length}</div>` : "";
+        const ctuForm = `<form action="${ctuSearchPath}" method="post" target="_blank">
+                           <input type="hidden" name="search_block_form" value="${esc(d.callsign)}">
+                           <button type="submit">${T.res_ctu}</button>
+                         </form>`;
+        const links = externalLinks(d.callsign)
+          .map(([label, href]) => `<a href="${href}" target="_blank" rel="noopener">${label}</a>`)
+          .join(" · ");
         box.innerHTML = `<div class="cs">${d.callsign}${badge}</div>
-                         <div class="detail">${detail}</div>${cnt}`;
+                         <div class="detail">${detail}</div>${cnt}
+                         <div class="links"><span>${T.res_external}</span> ${ctuForm} ${links}</div>`;
       } catch {
         box.textContent = T.res_error;
       }
