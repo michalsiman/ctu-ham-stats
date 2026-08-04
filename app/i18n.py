@@ -14,8 +14,8 @@ LANGUAGES = {
 
 TRANSLATIONS: dict[str, dict[str, str]] = {
     "cs": {
-        "title": "ČTÚ Ham Stats",
-        "subtitle": "Individuální oprávnění amatérské služby v ČR · zdroj: otevřená data ČTÚ",
+        "title": "Statistiky ham rádia",
+        "subtitle": "Statistiky radioamatérské služby (nejen) v ČR · zdroj: otevřená data ČTÚ a externí zdroje",
         "search_placeholder": "značka",
         "search_label": "Volací značka",
         "search_button": "Vyhledat značku",
@@ -71,8 +71,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "lang_label": "Jazyk",
     },
     "en": {
-        "title": "CTU Ham Stats",
-        "subtitle": "Individual amateur radio licences in Czechia · source: CTU open data",
+        "title": "Ham Radio Statistics",
+        "subtitle": "Amateur radio service statistics (not only) in Czechia · source: CTU open data and external sources",
         "search_placeholder": "CALL",
         "search_label": "Callsign",
         "search_button": "Search callsign",
@@ -128,8 +128,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "lang_label": "Language",
     },
     "de": {
-        "title": "ČTÚ Ham Stats",
-        "subtitle": "Amateurfunk-Einzelgenehmigungen in Tschechien · Quelle: offene Daten der ČTÚ",
+        "title": "Hamfunk-Statistiken",
+        "subtitle": "Statistiken des Amateurfunkdienstes (nicht nur) in Tschechien · Quelle: offene Daten der ČTÚ und externe Quellen",
         "search_placeholder": "CALL",
         "search_label": "Rufzeichen",
         "search_button": "Rufzeichen suchen",
@@ -185,8 +185,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "lang_label": "Sprache",
     },
     "fr": {
-        "title": "ČTÚ Ham Stats",
-        "subtitle": "Licences radioamateurs individuelles en Tchéquie · source : données ouvertes ČTÚ",
+        "title": "Statistiques radioamateur",
+        "subtitle": "Statistiques du service radioamateur (pas seulement) en Tchéquie · source : données ouvertes ČTÚ et sources externes",
         "search_placeholder": "CALL",
         "search_label": "Indicatif",
         "search_button": "Rechercher un indicatif",
