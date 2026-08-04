@@ -4,6 +4,7 @@ Webová aplikace zobrazující statistiky radioamatérských individuálních op
 
 Adresa aplikace: https://stats.ok1sim.cz/
 
+
 Zdroj dat: [Individuální oprávnění a volací značky stanic amatérské služby](https://data.ctu.gov.cz/dataset/individualni-opravneni-volaci-znacky-stanic-amaterske-sluzby) (CSV, aktualizace několikrát denně).
 
 ## Co umí
