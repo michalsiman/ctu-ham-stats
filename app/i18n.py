@@ -16,7 +16,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
     "cs": {
         "title": "ČTÚ Ham Stats",
         "subtitle": "Individuální oprávnění amatérské služby v ČR · zdroj: otevřená data ČTÚ",
-        "search_placeholder": "OK1SIM",
+        "search_placeholder": "značka",
         "search_label": "Volací značka",
         "search_button": "Vyhledat značku",
         "card_total_rows": "Platná oprávnění (řádky)",
@@ -66,7 +66,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
     "en": {
         "title": "CTU Ham Stats",
         "subtitle": "Individual amateur radio licences in Czechia · source: CTU open data",
-        "search_placeholder": "OK1SIM",
+        "search_placeholder": "CALL",
         "search_label": "Callsign",
         "search_button": "Search callsign",
         "card_total_rows": "Valid licences (rows)",
@@ -116,7 +116,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
     "de": {
         "title": "ČTÚ Ham Stats",
         "subtitle": "Amateurfunk-Einzelgenehmigungen in Tschechien · Quelle: offene Daten der ČTÚ",
-        "search_placeholder": "OK1SIM",
+        "search_placeholder": "CALL",
         "search_label": "Rufzeichen",
         "search_button": "Rufzeichen suchen",
         "card_total_rows": "Gültige Genehmigungen (Zeilen)",
@@ -166,7 +166,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
     "fr": {
         "title": "ČTÚ Ham Stats",
         "subtitle": "Licences radioamateurs individuelles en Tchéquie · source : données ouvertes ČTÚ",
-        "search_placeholder": "OK1SIM",
+        "search_placeholder": "CALL",
         "search_label": "Indicatif",
         "search_button": "Rechercher un indicatif",
         "card_total_rows": "Licences valides (lignes)",
