@@ -6,6 +6,7 @@ import csv
 import hashlib
 import io
 import logging
+import re
 import sqlite3
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -23,6 +24,22 @@ def download_csv(url: str = config.CSV_URL) -> str:
     resp.raise_for_status()
     resp.encoding = resp.encoding or "utf-8"
     return resp.text
+
+
+def parse_germany_callsigns_total(content: str) -> int:
+    """Vytáhne aktuální součet GESAMT ze stránky 12db statistik."""
+    match = re.search(r"GESAMT\s+([\d.]+)", content, flags=re.IGNORECASE | re.DOTALL)
+    if not match:
+        raise ValueError("GESAMT not found")
+    return int(match.group(1).replace(".", ""))
+
+
+def fetch_germany_callsigns_total(url: str = config.DE_RUFZEICHEN_STATS_URL) -> int:
+    """Stáhne aktuální počet německých personengebundených značek."""
+    resp = httpx.get(url, timeout=60, follow_redirects=True)
+    resp.raise_for_status()
+    resp.encoding = resp.encoding or "utf-8"
+    return parse_germany_callsigns_total(resp.text)
 
 
 def archive_csv(content: str, snapshot_date: date,
@@ -154,6 +171,17 @@ def run_ingest(snapshot_date: date | None = None) -> dict:
     conn = db.connect()
     try:
         result = store_snapshot(conn, rows, snapshot_date)
+        try:
+            germany_total = fetch_germany_callsigns_total()
+        except Exception:  # noqa: BLE001
+            log.exception("Nepodařilo se načíst statistiku 12db")
+        else:
+            db.set_state(
+                conn,
+                "germany_callsigns_total",
+                str(germany_total),
+                datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            )
     finally:
         conn.close()
     log.info("Ingest hotov: %s", result)

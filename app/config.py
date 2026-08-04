@@ -9,6 +9,12 @@ CSV_URL = os.getenv(
     "import_radiove_kmitocty/import_radiove_kmitocty_opravneni.csv",
 )
 
+# Statistiky německých personengebundených značek (aktuální stav).
+DE_RUFZEICHEN_STATS_URL = os.getenv(
+    "DE_RUFZEICHEN_STATS_URL",
+    "https://www.12db.de/rufzeichen/statistik/",
+)
+
 # Adresář s daty (SQLite + archiv CSV)
 DATA_DIR = Path(os.getenv("DATA_DIR", "data"))
 ARCHIVE_DIR = DATA_DIR / "archive"

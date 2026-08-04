@@ -75,6 +75,10 @@ def summary(conn: sqlite3.Connection) -> dict | None:
         "SELECT * FROM daily_stats WHERE snapshot_date = ?", (latest,)
     ).fetchone()
     monthly = monthly_change(conn)
+    germany = conn.execute(
+        "SELECT value FROM app_state WHERE key = ?",
+        ("germany_callsigns_total",),
+    ).fetchone()
     return {
         "snapshot_date": latest,
         "fetched_at": stats["fetched_at"],
@@ -85,6 +89,7 @@ def summary(conn: sqlite3.Connection) -> dict | None:
         "expiring_7": expiring_count(conn, 7),
         "expiring_30": expiring_count(conn, 30),
         "expiring_90": expiring_count(conn, 90),
+        "germany_callsigns_total": int(germany["value"]) if germany else None,
         "monthly_added": monthly["added"] if monthly else None,
         "monthly_removed": monthly["removed"] if monthly else None,
         "unattended": len(station_list(conn, "unattended")),

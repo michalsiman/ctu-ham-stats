@@ -260,6 +260,37 @@ def test_summary_exposes_fetch_time(conn):
     assert s["fetched_at"].endswith("+00:00")   # UTC ISO timestamp
 
 
+def test_parse_germany_callsigns_total():
+    from app.ingest import parse_germany_callsigns_total
+
+    html = """
+    <div>
+      KLASSE A 50.643
+      GESAMT 61.039
+    </div>
+    """
+    assert parse_germany_callsigns_total(html) == 61039
+
+
+def test_run_ingest_stores_germany_total(tmp_path, monkeypatch):
+    from app import config, ingest
+
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "test.db")
+    monkeypatch.setattr(config, "ARCHIVE_DIR", tmp_path / "archive")
+    monkeypatch.setattr(ingest, "download_csv", lambda url=config.CSV_URL: (FIXTURES / "sample_day1.csv").read_text(encoding="utf-8"))
+    monkeypatch.setattr(ingest, "fetch_germany_callsigns_total", lambda url=config.DE_RUFZEICHEN_STATS_URL: 61039)
+
+    ingest.run_ingest(date(2026, 8, 1))
+
+    conn = db.connect(config.DB_PATH)
+    try:
+        s = stats.summary(conn)
+    finally:
+        conn.close()
+
+    assert s["germany_callsigns_total"] == 61039
+
+
 def test_repeated_run_updates_fetch_time(conn):
     store_snapshot(conn, load("sample_day1.csv"), date(2026, 8, 1))
     first = stats.summary(conn)["fetched_at"]

@@ -133,6 +133,61 @@
     text-shadow: 0 0 12px rgba(255, 180, 84, .35);
     margin-top: 4px;
   }
+  .card .value .country-count {
+    font-variant-numeric: tabular-nums;
+  }
+  .card .label.with-source {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .source-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .source-icon {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    border: 1px solid var(--muted);
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .72rem;
+    line-height: 1;
+    cursor: help;
+  }
+  .source-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 5;
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: .72rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-2px);
+    transition: opacity .15s ease, transform .15s ease;
+  }
+  .source-wrap:hover .source-popover,
+  .source-wrap:focus-within .source-popover {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+  .source-popover a {
+    color: var(--lcd);
+    text-decoration: none;
+  }
+  .source-popover a:hover { text-decoration: underline; }
   .card .value .month-na {
     font-size: .72rem;
     line-height: 1.1;
@@ -451,6 +506,24 @@
           <span class="delta-rem">−{{ summary.monthly_removed }}</span>
         {% else %}
           <small class="month-na">{{ t.card_month_na }}</small>
+        {% endif %}
+      </div>
+    </div>
+    <div class="card">
+      <div class="label with-source">
+        <span>{{ t.card_germany }}</span>
+        <span class="source-wrap" tabindex="0" aria-label="{{ t.card_germany_source }}">
+          <span class="source-icon" aria-hidden="true">i</span>
+          <span class="source-popover">
+            <a href="https://www.12db.de/rufzeichen/statistik/" target="_blank" rel="noopener">{{ t.card_germany_source }}</a>
+          </span>
+        </span>
+      </div>
+      <div class="value">
+        {% if summary.germany_callsigns_total is not none %}
+          <span class="country-count">{{ "{:,}".format(summary.germany_callsigns_total).replace(",", ".") }}</span>
+        {% else %}
+          <small>{{ t.card_germany_na }}</small>
         {% endif %}
       </div>
     </div>

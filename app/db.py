@@ -25,6 +25,12 @@ CREATE TABLE IF NOT EXISTS daily_stats (
     removed          INTEGER,           -- zmizelé záznamy proti předchozímu snapshotu
     fetched_at       TEXT NOT NULL      -- UTC timestamp stažení
 );
+
+CREATE TABLE IF NOT EXISTS app_state (
+    key         TEXT PRIMARY KEY,
+    value       TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
 """
 
 
@@ -35,3 +41,16 @@ def connect(db_path: Path | None = None) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
     return conn
+
+
+def set_state(conn: sqlite3.Connection, key: str, value: str, updated_at: str) -> None:
+    conn.execute(
+        """
+        INSERT INTO app_state (key, value, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(key) DO UPDATE SET
+            value = excluded.value,
+            updated_at = excluded.updated_at
+        """,
+        (key, value, updated_at),
+    )
