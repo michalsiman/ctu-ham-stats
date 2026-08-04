@@ -2,6 +2,8 @@
 
 Webová aplikace zobrazující statistiky radioamatérských individuálních oprávnění v ČR nad otevřenými daty Českého telekomunikačního úřadu.
 
+Adresa aplikace: https://stats.ok1sim.cz/
+
 Zdroj dat: [Individuální oprávnění a volací značky stanic amatérské služby](https://data.ctu.gov.cz/dataset/individualni-opravneni-volaci-znacky-stanic-amaterske-sluzby) (CSV, aktualizace denně kolem 05:00).
 
 ## Co umí
