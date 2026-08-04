@@ -133,6 +133,10 @@
     text-shadow: 0 0 12px rgba(255, 180, 84, .35);
     margin-top: 4px;
   }
+  .card .value .month-na {
+    font-size: .72rem;
+    line-height: 1.1;
+  }
   .card .value small { font-size: .9rem; color: var(--lcd-dim); }
   .delta-add { color: var(--ok); }
   .delta-rem { color: var(--warn); }
@@ -399,7 +403,7 @@
           <span class="delta-add">+{{ summary.monthly_added }}</span>
           <span class="delta-rem">−{{ summary.monthly_removed }}</span>
         {% else %}
-          <small>{{ t.card_month_na }}</small>
+          <small class="month-na">{{ t.card_month_na }}</small>
         {% endif %}
       </div>
     </div>
