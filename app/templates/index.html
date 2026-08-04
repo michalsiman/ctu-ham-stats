@@ -97,6 +97,10 @@
     align-items: flex-start;
     height: 100%;
   }
+  .card.card-germany {
+    background: #171b20;
+    border-color: #262b33;
+  }
   .card-btn {
     text-align: left;
     font: inherit;
@@ -509,24 +513,6 @@
         {% endif %}
       </div>
     </div>
-    <div class="card">
-      <div class="label with-source">
-        <span>{{ t.card_germany }}</span>
-        <span class="source-wrap" tabindex="0" aria-label="{{ t.card_germany_source }}">
-          <span class="source-icon" aria-hidden="true">i</span>
-          <span class="source-popover">
-            <a href="https://www.12db.de/rufzeichen/statistik/" target="_blank" rel="noopener">{{ t.card_germany_source }}</a>
-          </span>
-        </span>
-      </div>
-      <div class="value">
-        {% if summary.germany_callsigns_total is not none %}
-          <span class="country-count">{{ "{:,}".format(summary.germany_callsigns_total).replace(",", ".") }}</span>
-        {% else %}
-          <small>{{ t.card_germany_na }}</small>
-        {% endif %}
-      </div>
-    </div>
     <button class="card card-btn" data-days="7">
       <div class="label">{{ t.card_expiring_7 }}</div>
       <div class="value">{{ summary.expiring_7 }}</div>
@@ -551,6 +537,24 @@
       <div class="label">{{ t.card_clubs }}</div>
       <div class="value">{{ summary.clubs }}</div>
     </button>
+    <div class="card card-germany">
+      <div class="label with-source">
+        <span>{{ t.card_germany }}</span>
+        <span class="source-wrap" tabindex="0" aria-label="{{ t.card_germany_source }}">
+          <span class="source-icon" aria-hidden="true">i</span>
+          <span class="source-popover">
+            <a href="https://www.12db.de/rufzeichen/statistik/" target="_blank" rel="noopener">{{ t.card_germany_source }}</a>
+          </span>
+        </span>
+      </div>
+      <div class="value">
+        {% if summary.germany_callsigns_total is not none %}
+          <span class="country-count">{{ "{:,}".format(summary.germany_callsigns_total).replace(",", ".") }}</span>
+        {% else %}
+          <small>{{ t.card_germany_na }}</small>
+        {% endif %}
+      </div>
+    </div>
   </section>
 
   <section class="expiring-panel" id="expiringPanel">
