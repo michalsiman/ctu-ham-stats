@@ -222,9 +222,9 @@ def new_callsigns_count(conn: sqlite3.Connection, days: int) -> int | None:
     tedy podle data `first_seen` bez ohledu na to, zda jsou dnes aktivní.
     Prodloužení existující značky se sem nedostane, protože nemění `first_seen`.
     """
-        latest = latest_snapshot(conn)
-        baseline = earliest_snapshot(conn)
-        if not latest or not baseline:
+    latest = latest_snapshot(conn)
+    baseline = earliest_snapshot(conn)
+    if not latest or not baseline:
         return None
     start, end = _new_callsigns_window(latest, days)
     row = conn.execute(
@@ -233,9 +233,9 @@ def new_callsigns_count(conn: sqlite3.Connection, days: int) -> int | None:
         FROM callsigns
         WHERE first_seen >= ?
           AND first_seen <= ?
-                    AND first_seen > ?
+          AND first_seen > ?
         """,
-                (start, end, baseline),
+        (start, end, baseline),
     ).fetchone()
     return row["n"]
 
@@ -254,8 +254,7 @@ def new_callsigns_list(conn: sqlite3.Connection, days: int, limit: int = 500) ->
             c.first_seen,
             MAX(l.valid_until) AS valid_until
         FROM callsigns c
-        JOIN licenses l
-                    ON l.callsign = c.callsign
+                JOIN licenses l ON l.callsign = c.callsign
         WHERE c.first_seen >= ?
           AND c.first_seen <= ?
                     AND c.first_seen > ?
