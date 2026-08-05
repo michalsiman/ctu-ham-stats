@@ -38,30 +38,30 @@ def _callsign_delta_between_snapshots(
     added = conn.execute(
         """
         SELECT COUNT(*) AS n FROM (
-            SELECT DISTINCT callsign
-            FROM licenses
-            WHERE last_seen = ?
+            SELECT callsign
+            FROM callsigns
+            WHERE first_seen <= ? AND last_seen >= ?
             EXCEPT
-            SELECT DISTINCT callsign
-            FROM licenses
-            WHERE last_seen = ?
+            SELECT callsign
+            FROM callsigns
+            WHERE first_seen <= ? AND last_seen >= ?
         )
         """,
-        (newer_snapshot, older_snapshot),
+        (newer_snapshot, newer_snapshot, older_snapshot, older_snapshot),
     ).fetchone()["n"]
     removed = conn.execute(
         """
         SELECT COUNT(*) AS n FROM (
-            SELECT DISTINCT callsign
-            FROM licenses
-            WHERE last_seen = ?
+            SELECT callsign
+            FROM callsigns
+            WHERE first_seen <= ? AND last_seen >= ?
             EXCEPT
-            SELECT DISTINCT callsign
-            FROM licenses
-            WHERE last_seen = ?
+            SELECT callsign
+            FROM callsigns
+            WHERE first_seen <= ? AND last_seen >= ?
         )
         """,
-        (older_snapshot, newer_snapshot),
+        (older_snapshot, older_snapshot, newer_snapshot, newer_snapshot),
     ).fetchone()["n"]
     return added, removed
 
@@ -92,32 +92,32 @@ def daily_delta_details(conn: sqlite3.Connection) -> dict | None:
     added_rows = conn.execute(
         """
         SELECT callsign FROM (
-            SELECT DISTINCT callsign
-            FROM licenses
-            WHERE last_seen = ?
+            SELECT callsign
+            FROM callsigns
+            WHERE first_seen <= ? AND last_seen >= ?
             EXCEPT
-            SELECT DISTINCT callsign
-            FROM licenses
-            WHERE last_seen = ?
+            SELECT callsign
+            FROM callsigns
+            WHERE first_seen <= ? AND last_seen >= ?
         )
         ORDER BY callsign
         """,
-        (latest, prev_snapshot),
+        (latest, latest, prev_snapshot, prev_snapshot),
     ).fetchall()
     removed_rows = conn.execute(
         """
         SELECT callsign FROM (
-            SELECT DISTINCT callsign
-            FROM licenses
-            WHERE last_seen = ?
+            SELECT callsign
+            FROM callsigns
+            WHERE first_seen <= ? AND last_seen >= ?
             EXCEPT
-            SELECT DISTINCT callsign
-            FROM licenses
-            WHERE last_seen = ?
+            SELECT callsign
+            FROM callsigns
+            WHERE first_seen <= ? AND last_seen >= ?
         )
         ORDER BY callsign
         """,
-        (prev_snapshot, latest),
+        (prev_snapshot, prev_snapshot, latest, latest),
     ).fetchall()
 
     added = [r["callsign"] for r in added_rows]
