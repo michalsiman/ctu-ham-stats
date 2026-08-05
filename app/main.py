@@ -89,6 +89,18 @@ def api_daily(limit: int = Query(365, ge=1, le=3650)):
         conn.close()
 
 
+@app.get("/api/delta")
+def api_delta():
+    conn = db.connect()
+    try:
+        result = stats.daily_delta_details(conn)
+    finally:
+        conn.close()
+    if result is None:
+        raise HTTPException(404, "Zatím žádná data – spusťte ingest.")
+    return result
+
+
 @app.get("/api/expiring")
 def api_expiring(days: int = Query(30, ge=1, le=730)):
     conn = db.connect()

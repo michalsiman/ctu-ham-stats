@@ -61,6 +61,20 @@ def test_summary_recomputes_daily_delta_from_callsigns(conn):
     assert s["removed"] == 1
 
 
+def test_daily_delta_details_lists_added_and_removed_callsigns(conn):
+    store_snapshot(conn, load("sample_day1.csv"), date(2026, 8, 1))
+    store_snapshot(conn, load("sample_day2.csv"), date(2026, 8, 2))
+
+    d = stats.daily_delta_details(conn)
+    assert d["snapshot_date"] == "2026-08-02"
+    assert d["compare_to"] == "2026-08-01"
+    assert d["added"] == ["OK9NEW"]
+    assert d["removed"] == ["OK1CCC"]
+    assert d["added_count"] == 1
+    assert d["removed_count"] == 1
+    assert d["net"] == 0
+
+
 def test_ingest_is_idempotent(conn):
     store_snapshot(conn, load("sample_day1.csv"), date(2026, 8, 1))
     store_snapshot(conn, load("sample_day2.csv"), date(2026, 8, 2))

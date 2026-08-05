@@ -38,32 +38,99 @@ def _callsign_delta_between_snapshots(
     added = conn.execute(
         """
         SELECT COUNT(*) AS n FROM (
-            SELECT callsign
-            FROM callsigns
-            WHERE first_seen <= ? AND last_seen >= ?
+            SELECT DISTINCT callsign
+            FROM licenses
+            WHERE last_seen = ?
             EXCEPT
-            SELECT callsign
-            FROM callsigns
-            WHERE first_seen <= ? AND last_seen >= ?
+            SELECT DISTINCT callsign
+            FROM licenses
+            WHERE last_seen = ?
         )
         """,
-        (newer_snapshot, newer_snapshot, older_snapshot, older_snapshot),
+        (newer_snapshot, older_snapshot),
     ).fetchone()["n"]
     removed = conn.execute(
         """
         SELECT COUNT(*) AS n FROM (
-            SELECT callsign
-            FROM callsigns
-            WHERE first_seen <= ? AND last_seen >= ?
+            SELECT DISTINCT callsign
+            FROM licenses
+            WHERE last_seen = ?
             EXCEPT
-            SELECT callsign
-            FROM callsigns
-            WHERE first_seen <= ? AND last_seen >= ?
+            SELECT DISTINCT callsign
+            FROM licenses
+            WHERE last_seen = ?
         )
         """,
-        (older_snapshot, older_snapshot, newer_snapshot, newer_snapshot),
+        (older_snapshot, newer_snapshot),
     ).fetchone()["n"]
     return added, removed
+
+
+def daily_delta_details(conn: sqlite3.Connection) -> dict | None:
+    """Detail denní změny: které značky mezi posledními 2 snapshoty přibyly/ubyly."""
+    latest = latest_snapshot(conn)
+    if not latest:
+        return None
+
+    prev = conn.execute(
+        "SELECT snapshot_date FROM daily_stats WHERE snapshot_date < ? "
+        "ORDER BY snapshot_date DESC LIMIT 1",
+        (latest,),
+    ).fetchone()
+    prev_snapshot = prev["snapshot_date"] if prev else None
+    if not prev_snapshot:
+        return {
+            "snapshot_date": latest,
+            "compare_to": None,
+            "added": [],
+            "removed": [],
+            "added_count": 0,
+            "removed_count": 0,
+            "net": 0,
+        }
+
+    added_rows = conn.execute(
+        """
+        SELECT callsign FROM (
+            SELECT DISTINCT callsign
+            FROM licenses
+            WHERE last_seen = ?
+            EXCEPT
+            SELECT DISTINCT callsign
+            FROM licenses
+            WHERE last_seen = ?
+        )
+        ORDER BY callsign
+        """,
+        (latest, prev_snapshot),
+    ).fetchall()
+    removed_rows = conn.execute(
+        """
+        SELECT callsign FROM (
+            SELECT DISTINCT callsign
+            FROM licenses
+            WHERE last_seen = ?
+            EXCEPT
+            SELECT DISTINCT callsign
+            FROM licenses
+            WHERE last_seen = ?
+        )
+        ORDER BY callsign
+        """,
+        (prev_snapshot, latest),
+    ).fetchall()
+
+    added = [r["callsign"] for r in added_rows]
+    removed = [r["callsign"] for r in removed_rows]
+    return {
+        "snapshot_date": latest,
+        "compare_to": prev_snapshot,
+        "added": added,
+        "removed": removed,
+        "added_count": len(added),
+        "removed_count": len(removed),
+        "net": len(added) - len(removed),
+    }
 
 
 def summary(conn: sqlite3.Connection) -> dict | None:

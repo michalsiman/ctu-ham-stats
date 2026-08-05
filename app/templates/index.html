@@ -388,6 +388,34 @@
   }
   .cs-item small { display: block; color: var(--muted); font-family: inherit; font-size: .72rem; }
   .cs-item:hover { border-color: var(--lcd-dim); }
+  .delta-wrap {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 10px;
+  }
+  .delta-col {
+    background: #101317;
+    border: 1px solid var(--panel-edge);
+    border-radius: 6px;
+    padding: 10px;
+  }
+  .delta-col h4 {
+    margin: 0 0 8px;
+    font-size: .76rem;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+  }
+  .delta-col.add h4 { color: var(--ok); }
+  .delta-col.rem h4 { color: var(--warn); }
+  .delta-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 6px;
+  }
+  .delta-empty {
+    color: var(--muted);
+    font-size: .85rem;
+  }
   @media (max-width: 720px) {
     .breakdown { grid-template-columns: 1fr; }
     .breakdown .chart-panel { min-height: 0; }
@@ -505,7 +533,7 @@
       <div class="label">{{ t.card_unique }}</div>
       <div class="value">{{ summary.unique_callsigns }}</div>
     </div>
-    <div class="card">
+    <button class="card card-btn" data-kind="delta">
       <div class="label">{{ t.card_delta }}</div>
       <div class="value">
         {% if summary.added is not none %}
@@ -521,7 +549,7 @@
           <small>{{ t.card_first_snapshot }}</small>
         {% endif %}
       </div>
-    </div>
+    </button>
     <div class="card">
       <div class="label">{{ t.card_month_delta }}</div>
       <div class="value">
@@ -622,6 +650,7 @@
     const title = document.getElementById("expiringTitle");
     const cardBtns = document.querySelectorAll(".card-btn");
     const KIND_TITLES = {
+      delta: T.panel_delta,
       unattended: T.panel_unattended,
       special: T.panel_special,
       club: T.panel_club,
@@ -645,16 +674,47 @@
       panel.style.display = "block";
       openKey = key;
       try {
-        const url = days ? "/api/expiring?days=" + days : "/api/stations?kind=" + kind;
+        const url = days
+          ? "/api/expiring?days=" + days
+          : kind === "delta"
+            ? "/api/delta"
+            : "/api/stations?kind=" + kind;
         const d = await (await fetch(url)).json();
-        const list = [...d.callsigns].sort((a, b) => a.callsign.localeCompare(b.callsign));
-        title.textContent = days
-          ? T.panel_expiring.replace("{days}", days).replace("{count}", d.count)
-          : KIND_TITLES[kind].replace("{count}", d.count);
-        grid.innerHTML = list.map(x =>
-          `<button type="button" class="cs-item" data-cs="${x.callsign}">
-             ${x.callsign}<small>${T.until} ${fmt(x.valid_until)}</small>
-           </button>`).join("");
+        if (kind === "delta") {
+          title.textContent = KIND_TITLES.delta
+            .replace("{added}", d.added_count)
+            .replace("{removed}", d.removed_count)
+            .replace("{date}", d.snapshot_date)
+            .replace("{prev}", d.compare_to ?? "-");
+
+          const addedItems = d.added.length
+            ? d.added.map(cs => `<button type="button" class="cs-item" data-cs="${cs}">${cs}</button>`).join("")
+            : `<div class="delta-empty">${T.panel_none}</div>`;
+          const removedItems = d.removed.length
+            ? d.removed.map(cs => `<button type="button" class="cs-item" data-cs="${cs}">${cs}</button>`).join("")
+            : `<div class="delta-empty">${T.panel_none}</div>`;
+
+          grid.innerHTML = `<div class="delta-wrap">
+            <section class="delta-col add">
+              <h4>${T.panel_added.replace("{count}", d.added_count)}</h4>
+              <div class="delta-list">${addedItems}</div>
+            </section>
+            <section class="delta-col rem">
+              <h4>${T.panel_removed.replace("{count}", d.removed_count)}</h4>
+              <div class="delta-list">${removedItems}</div>
+            </section>
+          </div>`;
+        } else {
+          const list = [...d.callsigns].sort((a, b) => a.callsign.localeCompare(b.callsign));
+          title.textContent = days
+            ? T.panel_expiring.replace("{days}", days).replace("{count}", d.count)
+            : KIND_TITLES[kind].replace("{count}", d.count);
+          grid.innerHTML = list.map(x =>
+            `<button type="button" class="cs-item" data-cs="${x.callsign}">
+               ${x.callsign}<small>${T.until} ${fmt(x.valid_until)}</small>
+             </button>`).join("");
+        }
+
         grid.querySelectorAll(".cs-item").forEach(el => el.addEventListener("click", () => {
           document.getElementById("searchInput").value = el.dataset.cs;
           form.requestSubmit();
