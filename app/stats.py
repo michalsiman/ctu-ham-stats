@@ -418,15 +418,41 @@ def new_callsigns_list(conn: sqlite3.Connection, days: int, limit: int = 500) ->
     return [dict(r) for r in rows]
 
 
-def suggest_callsigns(conn: sqlite3.Connection, text: str, limit: int = 24) -> dict:
+def suggest_callsigns(
+    conn: sqlite3.Connection,
+    text: str,
+    limit: int = 48,
+    digit: str | None = None,
+) -> dict:
     """Navrhne volné značky OK{digit}{suffix} podle zadaného textu."""
     latest = latest_snapshot(conn)
     if not latest:
-        return {"input": text, "normalized": "", "count": 0, "suggestions": []}
+        return {
+            "input": text,
+            "normalized": "",
+            "digit_filter": digit,
+            "count": 0,
+            "suggestions": [],
+        }
 
     normalized = normalize_suggestion_seed(text)
     if not normalized:
-        return {"input": text, "normalized": "", "count": 0, "suggestions": []}
+        return {
+            "input": text,
+            "normalized": "",
+            "digit_filter": digit,
+            "count": 0,
+            "suggestions": [],
+        }
+
+    if digit is not None and (len(digit) != 1 or digit not in "0123456789"):
+        return {
+            "input": text,
+            "normalized": normalized,
+            "digit_filter": digit,
+            "count": 0,
+            "suggestions": [],
+        }
 
     current_callsigns = {
         row["callsign"]
@@ -443,7 +469,8 @@ def suggest_callsigns(conn: sqlite3.Connection, text: str, limit: int = 24) -> d
 
     available_by_suffix: list[tuple[str, list[str]]] = []
     for suffix in ordered_suffixes:
-        digits = [d for d in "1234567890" if f"OK{d}{suffix}" not in current_callsigns]
+        digits_pool = [digit] if digit else list("1234567890")
+        digits = [d for d in digits_pool if f"OK{d}{suffix}" not in current_callsigns]
         if digits:
             available_by_suffix.append((suffix, digits))
 
@@ -467,6 +494,7 @@ def suggest_callsigns(conn: sqlite3.Connection, text: str, limit: int = 24) -> d
                 return {
                     "input": text,
                     "normalized": normalized,
+                    "digit_filter": digit,
                     "count": len(suggestions),
                     "suggestions": suggestions,
                 }
@@ -477,6 +505,7 @@ def suggest_callsigns(conn: sqlite3.Connection, text: str, limit: int = 24) -> d
     return {
         "input": text,
         "normalized": normalized,
+        "digit_filter": digit,
         "count": len(suggestions),
         "suggestions": suggestions,
     }

@@ -358,6 +358,15 @@
     font-family: "Consolas", "DejaVu Sans Mono", monospace;
     font-size: 1.02rem;
   }
+  .suggest-form select {
+    background: #101317;
+    border: 1px solid var(--panel-edge);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-size: .9rem;
+  }
+  .suggest-form select:focus { outline: 2px solid var(--lcd-dim); }
   .suggest-form input:focus { outline: 2px solid var(--lcd-dim); }
   .suggest-form button {
     background: var(--panel);
@@ -794,6 +803,10 @@
           <input id="suggestInput" placeholder="${esc(T.suggest_placeholder)}"
                  maxlength="80" autocomplete="off" spellcheck="false"
                  aria-label="${esc(T.suggest_label)}">
+          <select id="suggestDigit" aria-label="${esc(T.suggest_digit_label)}">
+            <option value="">${esc(T.suggest_digit_any)}</option>
+            ${"0123456789".split("").map(d => `<option value="${d}">OK${d}</option>`).join("")}
+          </select>
           <button type="submit">${esc(T.suggest_button)}</button>
         </form>
         <div class="suggest-hint">${esc(T.suggest_hint)}</div>
@@ -803,6 +816,7 @@
 
       const suggestForm = document.getElementById("suggestForm");
       const suggestInput = document.getElementById("suggestInput");
+      const suggestDigit = document.getElementById("suggestDigit");
       const suggestMeta = document.getElementById("suggestMeta");
       const suggestResult = document.getElementById("suggestResult");
 
@@ -819,7 +833,10 @@
         suggestMeta.textContent = "";
         suggestResult.textContent = T.suggest_loading;
         try {
-          const r = await fetch("/api/suggest-callsign?text=" + encodeURIComponent(text));
+          const query = new URLSearchParams({ text });
+          const selectedDigit = suggestDigit.value;
+          if (selectedDigit) query.set("digit", selectedDigit);
+          const r = await fetch("/api/suggest-callsign?" + query.toString());
           if (!r.ok) {
             const err = await r.json().catch(() => ({}));
             suggestResult.innerHTML = `<div class="suggest-error">${esc(err.detail || T.suggest_error)}</div>`;

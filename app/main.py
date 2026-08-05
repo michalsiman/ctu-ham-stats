@@ -213,7 +213,11 @@ def api_new_callsigns(days: int = Query(30, ge=1, le=730)):
 
 
 @app.get("/api/suggest-callsign")
-def api_suggest_callsign(text: str = Query(..., max_length=80), limit: int = Query(24, ge=1, le=40)):
+def api_suggest_callsign(
+    text: str = Query(..., max_length=80),
+    digit: str | None = Query(None, pattern="^[0-9]$"),
+    limit: int = Query(48, ge=1, le=80),
+):
     normalized = stats.normalize_suggestion_seed(text)
     if not normalized:
         raise HTTPException(
@@ -222,7 +226,7 @@ def api_suggest_callsign(text: str = Query(..., max_length=80), limit: int = Que
         )
     conn = db.connect()
     try:
-        return stats.suggest_callsigns(conn, text, limit)
+        return stats.suggest_callsigns(conn, text, limit, digit)
     finally:
         conn.close()
 
