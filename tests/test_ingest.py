@@ -68,8 +68,8 @@ def test_daily_delta_details_lists_added_and_removed_callsigns(conn):
     d = stats.daily_delta_details(conn)
     assert d["snapshot_date"] == "2026-08-02"
     assert d["compare_to"] == "2026-08-01"
-    assert d["added"] == ["OK9NEW"]
-    assert d["removed"] == ["OK1CCC"]
+    assert d["added"] == [{"callsign": "OK9NEW", "valid_until": "2031-12-31"}]
+    assert d["removed"] == [{"callsign": "OK1CCC", "valid_until": "2026-07-31"}]
     assert d["added_count"] == 1
     assert d["removed_count"] == 1
     assert d["net"] == 0

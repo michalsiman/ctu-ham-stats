@@ -91,37 +91,63 @@ def daily_delta_details(conn: sqlite3.Connection) -> dict | None:
 
     added_rows = conn.execute(
         """
-        SELECT callsign FROM (
-            SELECT callsign
-            FROM callsigns
-            WHERE first_seen <= ? AND last_seen >= ?
-            EXCEPT
-            SELECT callsign
-            FROM callsigns
-            WHERE first_seen <= ? AND last_seen >= ?
-        )
-        ORDER BY callsign
+        WITH
+            newer AS (
+                SELECT callsign
+                FROM callsigns
+                WHERE first_seen <= ? AND last_seen >= ?
+            ),
+            older AS (
+                SELECT callsign
+                FROM callsigns
+                WHERE first_seen <= ? AND last_seen >= ?
+            ),
+            added AS (
+                SELECT callsign FROM newer
+                EXCEPT
+                SELECT callsign FROM older
+            )
+        SELECT a.callsign, MAX(l.valid_until) AS valid_until
+        FROM added a
+        JOIN licenses l
+            ON l.callsign = a.callsign
+           AND l.first_seen <= ? AND l.last_seen >= ?
+        GROUP BY a.callsign
+        ORDER BY a.callsign
         """,
-        (latest, latest, prev_snapshot, prev_snapshot),
+        (latest, latest, prev_snapshot, prev_snapshot, latest, latest),
     ).fetchall()
     removed_rows = conn.execute(
         """
-        SELECT callsign FROM (
-            SELECT callsign
-            FROM callsigns
-            WHERE first_seen <= ? AND last_seen >= ?
-            EXCEPT
-            SELECT callsign
-            FROM callsigns
-            WHERE first_seen <= ? AND last_seen >= ?
-        )
-        ORDER BY callsign
+        WITH
+            newer AS (
+                SELECT callsign
+                FROM callsigns
+                WHERE first_seen <= ? AND last_seen >= ?
+            ),
+            older AS (
+                SELECT callsign
+                FROM callsigns
+                WHERE first_seen <= ? AND last_seen >= ?
+            ),
+            removed AS (
+                SELECT callsign FROM older
+                EXCEPT
+                SELECT callsign FROM newer
+            )
+        SELECT r.callsign, MAX(l.valid_until) AS valid_until
+        FROM removed r
+        JOIN licenses l
+            ON l.callsign = r.callsign
+           AND l.first_seen <= ? AND l.last_seen >= ?
+        GROUP BY r.callsign
+        ORDER BY r.callsign
         """,
-        (prev_snapshot, prev_snapshot, latest, latest),
+        (latest, latest, prev_snapshot, prev_snapshot, prev_snapshot, prev_snapshot),
     ).fetchall()
 
-    added = [r["callsign"] for r in added_rows]
-    removed = [r["callsign"] for r in removed_rows]
+    added = [dict(r) for r in added_rows]
+    removed = [dict(r) for r in removed_rows]
     return {
         "snapshot_date": latest,
         "compare_to": prev_snapshot,

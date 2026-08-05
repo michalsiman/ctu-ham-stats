@@ -1,11 +1,15 @@
-# ČTÚ Ham Stats
+# STATISTIKY HAM RÁDIA
 
-Webová aplikace zobrazující statistiky radioamatérských individuálních oprávnění v ČR nad otevřenými daty Českého telekomunikačního úřadu.
+Webová aplikace zobrazující statistiky radioamatérských individuálních oprávnění (nejen) v ČR nad otevřenými daty Českého telekomunikačního úřadu a externími zdroji.
 
 Adresa aplikace: https://stats.ok1sim.cz/
 
 
 Zdroj dat: [Individuální oprávnění a volací značky stanic amatérské služby](https://data.ctu.gov.cz/dataset/individualni-opravneni-volaci-znacky-stanic-amaterske-sluzby) (CSV, aktualizace několikrát denně).
+
+## Historie
+
+Aplikace se poprvé objevila v roce 2024 na mé staré doméně vlastni.cloud, kterou jsem ale kompletně zrušil a nechal jsem si jen doménu ok1sim.cz. Původní aplikace si neměla historii i když jsem ji plánoval, takže nebyl vidět trend a změny oproti předchozím období. Nová aplikace už tohle umí.
 
 ## Co umí
 

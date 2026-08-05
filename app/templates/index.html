@@ -388,33 +388,20 @@
   }
   .cs-item small { display: block; color: var(--muted); font-family: inherit; font-size: .72rem; }
   .cs-item:hover { border-color: var(--lcd-dim); }
-  .delta-wrap {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 10px;
-  }
-  .delta-col {
-    background: #101317;
-    border: 1px solid var(--panel-edge);
-    border-radius: 6px;
-    padding: 10px;
-  }
-  .delta-col h4 {
-    margin: 0 0 8px;
-    font-size: .76rem;
+  .delta-wrap { display: grid; gap: 12px; }
+  .delta-head {
+    font-size: .78rem;
+    letter-spacing: .08em;
     text-transform: uppercase;
-    letter-spacing: .1em;
+    color: var(--muted);
+    margin-bottom: 6px;
   }
-  .delta-col.add h4 { color: var(--ok); }
-  .delta-col.rem h4 { color: var(--warn); }
-  .delta-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 6px;
-  }
+  .delta-head.add { color: var(--ok); }
+  .delta-head.rem { color: var(--warn); }
   .delta-empty {
     color: var(--muted);
     font-size: .85rem;
+    padding: 2px 0 6px;
   }
   @media (max-width: 720px) {
     .breakdown { grid-template-columns: 1fr; }
@@ -649,6 +636,7 @@
     const grid = document.getElementById("expiringGrid");
     const title = document.getElementById("expiringTitle");
     const cardBtns = document.querySelectorAll(".card-btn");
+    const langLinks = document.querySelectorAll(".langs a");
     const KIND_TITLES = {
       delta: T.panel_delta,
       unattended: T.panel_unattended,
@@ -657,12 +645,28 @@
     };
     let openKey = null;
 
+    function setPanelQueryParam(key) {
+      const u = new URL(window.location.href);
+      if (key) u.searchParams.set("panel", key);
+      else u.searchParams.delete("panel");
+      history.replaceState(null, "", u.toString());
+    }
+
     function closePanel() {
       panel.style.display = "none";
       openKey = null;
       cardBtns.forEach(b => b.classList.remove("open"));
+      setPanelQueryParam(null);
     }
     document.getElementById("expiringClose").addEventListener("click", closePanel);
+
+    langLinks.forEach(link => link.addEventListener("click", e => {
+      const u = new URL(link.href, window.location.origin);
+      const panelKey = openKey || new URL(window.location.href).searchParams.get("panel");
+      if (panelKey) u.searchParams.set("panel", panelKey);
+      else u.searchParams.delete("panel");
+      e.currentTarget.href = u.toString();
+    }));
 
     cardBtns.forEach(btn => btn.addEventListener("click", async () => {
       const days = btn.dataset.days, kind = btn.dataset.kind;
@@ -673,6 +677,7 @@
       grid.innerHTML = "";
       panel.style.display = "block";
       openKey = key;
+      setPanelQueryParam(key);
       try {
         const url = days
           ? "/api/expiring?days=" + days
@@ -688,20 +693,24 @@
             .replace("{prev}", d.compare_to ?? "-");
 
           const addedItems = d.added.length
-            ? d.added.map(cs => `<button type="button" class="cs-item" data-cs="${cs}">${cs}</button>`).join("")
+            ? d.added.map(x => `<button type="button" class="cs-item" data-cs="${x.callsign}">
+                ${x.callsign}<small>${T.until} ${fmt(x.valid_until)}</small>
+              </button>`).join("")
             : `<div class="delta-empty">${T.panel_none}</div>`;
           const removedItems = d.removed.length
-            ? d.removed.map(cs => `<button type="button" class="cs-item" data-cs="${cs}">${cs}</button>`).join("")
+            ? d.removed.map(x => `<button type="button" class="cs-item" data-cs="${x.callsign}">
+                ${x.callsign}<small>${T.until} ${fmt(x.valid_until)}</small>
+              </button>`).join("")
             : `<div class="delta-empty">${T.panel_none}</div>`;
 
           grid.innerHTML = `<div class="delta-wrap">
-            <section class="delta-col add">
-              <h4>${T.panel_added.replace("{count}", d.added_count)}</h4>
-              <div class="delta-list">${addedItems}</div>
+            <section>
+              <div class="delta-head add">${T.panel_added.replace("{count}", d.added_count)}</div>
+              <div class="cs-grid">${addedItems}</div>
             </section>
-            <section class="delta-col rem">
-              <h4>${T.panel_removed.replace("{count}", d.removed_count)}</h4>
-              <div class="delta-list">${removedItems}</div>
+            <section>
+              <div class="delta-head rem">${T.panel_removed.replace("{count}", d.removed_count)}</div>
+              <div class="cs-grid">${removedItems}</div>
             </section>
           </div>`;
         } else {
@@ -724,6 +733,15 @@
         title.textContent = T.panel_error;
       }
     }));
+
+    // Pokud je panel v URL, automaticky ho po načtení otevřeme.
+    const initialPanel = new URL(window.location.href).searchParams.get("panel");
+    if (initialPanel) {
+      const initialBtn = Array.from(cardBtns).find(btn =>
+        btn.dataset.days === initialPanel || btn.dataset.kind === initialPanel
+      );
+      if (initialBtn) initialBtn.click();
+    }
   </script>
 
   <script>
