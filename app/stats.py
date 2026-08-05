@@ -34,6 +34,61 @@ def _word_initials(text: str) -> str:
     return "".join(initials)
 
 
+def _tokenized_words(text: str) -> list[str]:
+    return [seed for part in text.split() if (seed := normalize_suggestion_seed(part))]
+
+
+def _word_pattern_bases(text: str) -> list[str]:
+    """Vytvoří krátké kandidáty z kombinací slov v původním pořadí.
+
+    Cíl je dostat i varianty typu:
+    - první písmena všech slov
+    - první dvě písmena prvního slova + první písmeno posledního
+    - první písmeno prvního + první dvě písmena druhého
+    """
+    words = _tokenized_words(text)
+    if not words:
+        return []
+
+    bases: list[str] = []
+
+    def add(candidate: str) -> None:
+        candidate = candidate[:3]
+        if candidate and candidate not in bases:
+            bases.append(candidate)
+
+    # Jednoslovné varianty: první 1-3 písmena každého slova.
+    for word in words:
+        for length in (1, 2, 3):
+            if len(word) >= length:
+                add(word[:length])
+
+    if len(words) >= 2:
+        first, last = words[0], words[-1]
+        second = words[1]
+
+        # Kombinace, které lidi běžně tvoří ručně.
+        add(first[0] + second[0] + last[0])
+        add(first[:2] + last[0])
+        add(first[0] + second[:2])
+        add(first[:2] + second[0])
+        add(first[0] + last[:2])
+        add(first[:2] + last[:1])
+
+        # Pokud je slov víc, zkus i všechny inicály v pořadí.
+        add(_word_initials(text))
+
+    if len(words) >= 3:
+        middle = words[1]
+        add(first[0] + middle[0] + last[0])
+        add(first[:2] + middle[0])
+        add(first[0] + middle[:2])
+        add(middle[:2] + last[0])
+        add(middle[0] + last[:2])
+
+    return bases
+
+
 def _candidate_suffixes(text: str, limit: int = 200) -> list[str]:
     """Vrátí kandidátní suffixy o délce 1-3 znaků v deterministickém pořadí."""
     bases = []
@@ -44,6 +99,10 @@ def _candidate_suffixes(text: str, limit: int = 200) -> list[str]:
     initials = _word_initials(text)
     if initials and initials not in bases:
         bases.append(initials)
+
+    for pattern in _word_pattern_bases(text):
+        if pattern and pattern not in bases:
+            bases.append(pattern)
 
     consonants = "".join(ch for ch in normalized if ch not in "AEIOUY")
     if consonants and consonants not in bases:
