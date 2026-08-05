@@ -45,6 +45,22 @@ def test_second_snapshot_diff(conn):
     assert result["removed"] == 1
 
 
+def test_summary_recomputes_daily_delta_from_callsigns(conn):
+    """UI denní delta má být z unikátních značek i při starých hodnotách v daily_stats."""
+    store_snapshot(conn, load("sample_day1.csv"), date(2026, 8, 1))
+    store_snapshot(conn, load("sample_day2.csv"), date(2026, 8, 2))
+
+    with conn:
+        conn.execute(
+            "UPDATE daily_stats SET added = ?, removed = ? WHERE snapshot_date = ?",
+            (17, 3, "2026-08-02"),
+        )
+
+    s = stats.summary(conn)
+    assert s["added"] == 1
+    assert s["removed"] == 1
+
+
 def test_ingest_is_idempotent(conn):
     store_snapshot(conn, load("sample_day1.csv"), date(2026, 8, 1))
     store_snapshot(conn, load("sample_day2.csv"), date(2026, 8, 2))

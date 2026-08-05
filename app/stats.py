@@ -74,6 +74,17 @@ def summary(conn: sqlite3.Connection) -> dict | None:
     stats = conn.execute(
         "SELECT * FROM daily_stats WHERE snapshot_date = ?", (latest,)
     ).fetchone()
+    prev = conn.execute(
+        "SELECT snapshot_date FROM daily_stats WHERE snapshot_date < ? "
+        "ORDER BY snapshot_date DESC LIMIT 1",
+        (latest,),
+    ).fetchone()
+    prev_snapshot = prev["snapshot_date"] if prev else None
+    if prev_snapshot:
+        added, removed = _callsign_delta_between_snapshots(conn, latest, prev_snapshot)
+    else:
+        added = removed = None
+
     monthly = monthly_change(conn)
     germany = conn.execute(
         "SELECT value FROM app_state WHERE key = ?",
@@ -83,8 +94,8 @@ def summary(conn: sqlite3.Connection) -> dict | None:
         "snapshot_date": latest,
         "fetched_at": stats["fetched_at"],
         "unique_callsigns": stats["unique_callsigns"],
-        "added": stats["added"],
-        "removed": stats["removed"],
+        "added": added,
+        "removed": removed,
         "expiring_7": expiring_count(conn, 7),
         "expiring_30": expiring_count(conn, 30),
         "expiring_90": expiring_count(conn, 90),
