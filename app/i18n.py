@@ -48,6 +48,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "panel_special": "Speciální (příležitostné) značky ({count})",
         "panel_club": "Klubové stanice – OK1/OK2 + 3 písmena od K, O, R ({count})",
         "panel_new_30": "Nové značky za posledních {days} dní ({count})",
+        "panel_first_seen": "první výskyt:",
         "panel_loading": "Načítám…",
         "panel_error": "Seznam se nepodařilo načíst.",
         "panel_close": "Zavřít",
@@ -93,6 +94,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "empty_title": "Zatím žádná data.",
         "empty_hint": "Spusťte první ingest:",
         "lang_label": "Jazyk",
+        "scroll_top": "Zpět nahoru",
     },
     "en": {
         "title": "Ham Radio Statistics",
@@ -129,6 +131,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "panel_special": "Special (event) callsigns ({count})",
         "panel_club": "Club stations – OK1/OK2 + 3 letters starting with K, O, R ({count})",
         "panel_new_30": "New callsigns in last {days} days ({count})",
+        "panel_first_seen": "first seen:",
         "panel_loading": "Loading…",
         "panel_error": "Could not load the list.",
         "panel_close": "Close",
@@ -174,6 +177,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "empty_title": "No data yet.",
         "empty_hint": "Run the first ingest:",
         "lang_label": "Language",
+        "scroll_top": "Back to top",
     },
     "de": {
         "title": "Hamfunk-Statistiken",
@@ -210,6 +214,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "panel_special": "Sonderrufzeichen (Veranstaltungen) ({count})",
         "panel_club": "Clubstationen – OK1/OK2 + 3 Buchstaben ab K, O, R ({count})",
         "panel_new_30": "Neue Rufzeichen der letzten {days} Tage ({count})",
+        "panel_first_seen": "erstmals gesehen:",
         "panel_loading": "Lädt…",
         "panel_error": "Liste konnte nicht geladen werden.",
         "panel_close": "Schließen",
@@ -255,6 +260,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "empty_title": "Noch keine Daten.",
         "empty_hint": "Ersten Ingest starten:",
         "lang_label": "Sprache",
+        "scroll_top": "Nach oben",
     },
     "fr": {
         "title": "Statistiques radioamateur",
@@ -291,6 +297,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "panel_special": "Indicatifs spéciaux (événements) ({count})",
         "panel_club": "Stations de club – OK1/OK2 + 3 lettres commençant par K, O, R ({count})",
         "panel_new_30": "Nouveaux indicatifs des {days} derniers jours ({count})",
+        "panel_first_seen": "première apparition :",
         "panel_loading": "Chargement…",
         "panel_error": "Impossible de charger la liste.",
         "panel_close": "Fermer",
@@ -338,6 +345,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "empty_title": "Aucune donnée pour l'instant.",
         "empty_hint": "Lancez le premier ingest :",
         "lang_label": "Langue",
+        "scroll_top": "Retour en haut",
     },
 }
 

@@ -117,6 +117,37 @@
   }
   .back a { color: var(--lcd); text-decoration: none; }
   .back a:hover { text-decoration: underline; }
+  .scroll-top-fab {
+    position: fixed;
+    right: 14px;
+    bottom: 18px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--panel-edge);
+    background: var(--panel);
+    color: var(--lcd);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+    font-size: 1.15rem;
+    line-height: 1;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(8px);
+    transition: opacity .18s ease, transform .18s ease, border-color .18s ease;
+    z-index: 50;
+  }
+  .scroll-top-fab:hover { border-color: var(--lcd-dim); }
+  .scroll-top-fab.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+  @media (max-width: 720px) {
+    .scroll-top-fab { display: inline-flex; }
+  }
   @media (max-width: 640px) {
     .head-row { flex-direction: column; align-items: stretch; }
   }
@@ -252,5 +283,26 @@
     <a href="/{% if lang %}?lang={{ lang }}{% endif %}">← {{ t.visits_back }}</a>
   </div>
 </div>
+<button type="button" class="scroll-top-fab" id="scrollTopBtn" aria-label="{{ t.scroll_top }}" title="{{ t.scroll_top }}">↑</button>
+
+<script>
+  const scrollTopBtn = document.getElementById("scrollTopBtn");
+  function toggleScrollTopBtn() {
+    if (!scrollTopBtn) return;
+    if (!window.matchMedia("(max-width: 720px)").matches) {
+      scrollTopBtn.classList.remove("visible");
+      return;
+    }
+    scrollTopBtn.classList.toggle("visible", window.scrollY > 260);
+  }
+  if (scrollTopBtn) {
+    window.addEventListener("scroll", toggleScrollTopBtn, { passive: true });
+    window.addEventListener("resize", toggleScrollTopBtn);
+    scrollTopBtn.addEventListener("click", () => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    toggleScrollTopBtn();
+  }
+</script>
 </body>
 </html>

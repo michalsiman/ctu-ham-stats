@@ -211,8 +211,9 @@ def _new_callsigns_window(latest: str, days: int) -> tuple[str, str]:
 def new_callsigns_count(conn: sqlite3.Connection, days: int) -> int | None:
     """Počet značek, které se poprvé objevily v posledních `days` dnech.
 
-    Počítají se jen značky, které jsou i v aktuálním snapshotu,
-    takže prodloužení existující značky se sem nedostane.
+    Jde o nové záznamy v tabulce unikátních značek (`callsigns`),
+    tedy podle data `first_seen` bez ohledu na to, zda jsou dnes aktivní.
+    Prodloužení existující značky se sem nedostane, protože nemění `first_seen`.
     """
     latest = latest_snapshot(conn)
     if not latest:
@@ -224,9 +225,8 @@ def new_callsigns_count(conn: sqlite3.Connection, days: int) -> int | None:
         FROM callsigns
         WHERE first_seen >= ?
           AND first_seen <= ?
-          AND last_seen = ?
         """,
-        (start, end, latest),
+                (start, end),
     ).fetchone()
     return row["n"]
 
@@ -245,16 +245,14 @@ def new_callsigns_list(conn: sqlite3.Connection, days: int, limit: int = 500) ->
             MAX(l.valid_until) AS valid_until
         FROM callsigns c
         JOIN licenses l
-          ON l.callsign = c.callsign
-         AND l.last_seen = ?
+                    ON l.callsign = c.callsign
         WHERE c.first_seen >= ?
           AND c.first_seen <= ?
-          AND c.last_seen = ?
         GROUP BY c.callsign, c.first_seen
         ORDER BY c.first_seen DESC, c.callsign ASC
         LIMIT ?
         """,
-        (latest, start, end, latest, limit),
+                (start, end, limit),
     ).fetchall()
     return [dict(r) for r in rows]
 
