@@ -78,6 +78,20 @@ def _word_pattern_bases(text: str) -> list[str]:
         # Pokud je slov víc, zkus i všechny inicály v pořadí.
         add(_word_initials(text))
 
+        # Kombinace z libovolných sousedních slov, aby se text skutečně míchal.
+        for idx in range(len(words) - 1):
+            left, right = words[idx], words[idx + 1]
+            add(left[0] + right[0])
+            add(left[:2] + right[0])
+            add(left[0] + right[:2])
+            add(left[:2] + right[:1])
+            add(left[:1] + right[:2])
+
+        # Kombinace z prvního a posledního slova.
+        add(first[0] + last[0])
+        add(first[:2] + last[0])
+        add(first[0] + last[:2])
+
     if len(words) >= 3:
         middle = words[1]
         add(first[0] + middle[0] + last[0])
@@ -85,6 +99,17 @@ def _word_pattern_bases(text: str) -> list[str]:
         add(first[0] + middle[:2])
         add(middle[:2] + last[0])
         add(middle[0] + last[:2])
+
+        # Vyzkoušej i všechny trojice slov v původním pořadí.
+        for start in range(len(words) - 2):
+            a, b, c = words[start], words[start + 1], words[start + 2]
+            add(a[0] + b[0] + c[0])
+            add(a[:2] + b[0] + c[0])
+            add(a[0] + b[:2] + c[0])
+            add(a[0] + b[0] + c[:2])
+            add(a[:2] + b[:1] + c[:1])
+            add(a[:1] + b[:2] + c[:1])
+            add(a[:1] + b[:1] + c[:2])
 
     return bases
 
@@ -393,7 +418,7 @@ def new_callsigns_list(conn: sqlite3.Connection, days: int, limit: int = 500) ->
     return [dict(r) for r in rows]
 
 
-def suggest_callsigns(conn: sqlite3.Connection, text: str, limit: int = 12) -> dict:
+def suggest_callsigns(conn: sqlite3.Connection, text: str, limit: int = 24) -> dict:
     """Navrhne volné značky OK{digit}{suffix} podle zadaného textu."""
     latest = latest_snapshot(conn)
     if not latest:
