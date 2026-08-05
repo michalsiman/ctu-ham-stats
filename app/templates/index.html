@@ -375,6 +375,9 @@
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 6px;
   }
+  .cs-grid.delta-mode {
+    display: block;
+  }
   .cs-item {
     background: #101317;
     border: 1px solid var(--panel-edge);
@@ -671,6 +674,7 @@
       panel.style.display = "none";
       openKey = null;
       cardBtns.forEach(b => b.classList.remove("open"));
+      grid.classList.remove("delta-mode");
       setPanelQueryParam(null);
     }
     document.getElementById("expiringClose").addEventListener("click", closePanel);
@@ -701,6 +705,7 @@
             : "/api/stations?kind=" + kind;
         const d = await (await fetch(url)).json();
         if (kind === "delta") {
+          grid.classList.add("delta-mode");
           title.textContent = KIND_TITLES.delta
             .replace("{added}", d.added_count)
             .replace("{removed}", d.removed_count)
@@ -729,6 +734,7 @@
             </section>
           </div>`;
         } else {
+          grid.classList.remove("delta-mode");
           const list = [...d.callsigns].sort((a, b) => a.callsign.localeCompare(b.callsign));
           title.textContent = days
             ? T.panel_expiring.replace("{days}", days).replace("{count}", d.count)
