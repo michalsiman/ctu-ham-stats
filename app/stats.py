@@ -187,6 +187,7 @@ def summary(conn: sqlite3.Connection) -> dict | None:
         "snapshot_date": latest,
         "fetched_at": stats["fetched_at"],
         "unique_callsigns": stats["unique_callsigns"],
+        "new_30": new_callsigns_count(conn, 30),
         "added": added,
         "removed": removed,
         "expiring_7": expiring_count(conn, 7),
@@ -199,6 +200,63 @@ def summary(conn: sqlite3.Connection) -> dict | None:
         "special": len(station_list(conn, "special")),
         "clubs": len(station_list(conn, "club")),
     }
+
+
+def _new_callsigns_window(latest: str, days: int) -> tuple[str, str]:
+    end = date.fromisoformat(latest)
+    start = end - timedelta(days=days - 1)
+    return start.isoformat(), end.isoformat()
+
+
+def new_callsigns_count(conn: sqlite3.Connection, days: int) -> int | None:
+    """Počet značek, které se poprvé objevily v posledních `days` dnech.
+
+    Počítají se jen značky, které jsou i v aktuálním snapshotu,
+    takže prodloužení existující značky se sem nedostane.
+    """
+    latest = latest_snapshot(conn)
+    if not latest:
+        return None
+    start, end = _new_callsigns_window(latest, days)
+    row = conn.execute(
+        """
+        SELECT COUNT(*) AS n
+        FROM callsigns
+        WHERE first_seen >= ?
+          AND first_seen <= ?
+          AND last_seen = ?
+        """,
+        (start, end, latest),
+    ).fetchone()
+    return row["n"]
+
+
+def new_callsigns_list(conn: sqlite3.Connection, days: int, limit: int = 500) -> list[dict]:
+    """Seznam nově vzniklých značek za posledních `days` dní."""
+    latest = latest_snapshot(conn)
+    if not latest:
+        return []
+    start, end = _new_callsigns_window(latest, days)
+    rows = conn.execute(
+        """
+        SELECT
+            c.callsign,
+            c.first_seen,
+            MAX(l.valid_until) AS valid_until
+        FROM callsigns c
+        JOIN licenses l
+          ON l.callsign = c.callsign
+         AND l.last_seen = ?
+        WHERE c.first_seen >= ?
+          AND c.first_seen <= ?
+          AND c.last_seen = ?
+        GROUP BY c.callsign, c.first_seen
+        ORDER BY c.first_seen DESC, c.callsign ASC
+        LIMIT ?
+        """,
+        (latest, start, end, latest, limit),
+    ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def expiring_count(conn: sqlite3.Connection, days: int) -> int | None:

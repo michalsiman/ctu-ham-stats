@@ -24,6 +24,7 @@ _BOT_UA_RE = re.compile(
     r"uptime|monitor|kube-probe|pingdom|facebookexternalhit|preview",
     re.IGNORECASE,
 )
+_CALLSIGN_INPUT_RE = re.compile(r"^(OK|OL)\d+[0-9A-Z]*$")
 
 
 @asynccontextmanager
@@ -201,13 +202,29 @@ def api_stations(kind: str = Query(..., pattern="^(unattended|special|club)$")):
     return {"kind": kind, "count": len(stations), "callsigns": stations}
 
 
-@app.get("/api/callsign/{callsign}")
-def api_callsign(callsign: str):
-    if not callsign.strip():
-        raise HTTPException(400, "Zadejte volací značku.")
+@app.get("/api/new-callsigns")
+def api_new_callsigns(days: int = Query(30, ge=1, le=730)):
     conn = db.connect()
     try:
-        return stats.callsign_lookup(conn, callsign)
+        callsigns = stats.new_callsigns_list(conn, days)
+    finally:
+        conn.close()
+    return {"days": days, "count": len(callsigns), "callsigns": callsigns}
+
+
+@app.get("/api/callsign/{callsign}")
+def api_callsign(callsign: str):
+    clean = callsign.strip().upper()
+    if not clean:
+        raise HTTPException(400, "Zadejte volací značku.")
+    if not _CALLSIGN_INPUT_RE.fullmatch(clean):
+        raise HTTPException(
+            400,
+            "Neplatný formát značky. Použijte tvar OK/OL + číslice + písmena/číslice.",
+        )
+    conn = db.connect()
+    try:
+        return stats.callsign_lookup(conn, clean)
     finally:
         conn.close()
 

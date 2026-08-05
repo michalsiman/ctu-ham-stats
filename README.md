@@ -17,9 +17,13 @@ Aplikace se poprvé objevila v roce 2024 na mé staré doméně vlastni.cloud, k
 - stahuje víckrát denně (ČTÚ data mění i během dne), archiv se neduplikuje, pokud se CSV nezměnilo
 - ukládá snapshoty do SQLite a **diffuje je** – CSV neobsahuje datum vydání, takže přírůstky a úbytky lze zjistit jen porovnáváním snapshotů v čase
 - dashboard: aktuální počet unikátních volacích značek, denní a měsíční přírůstky/úbytky unikátních značek, počet značek expirujících do 7/30/90 dnů, graf vývoje
+- dashboard navíc obsahuje blok „nové značky za 30 dní“ (dle `first_seen`, tedy nově vzniklé, ne pouhé prodloužení)
 - jednoduché počítadlo návštěv hlavní stránky: denní unikáty, přehled podle země, souhrn za 7 dní a 365 dní na `/visits`
 - JSON API: `/api/summary`, `/api/daily`, `/api/expiring?days=30`, `/api/stations?kind=club`, `/api/callsign/OK1SIM`, `/api/breakdown`
+- JSON API nových značek: `/api/new-callsigns?days=30`
 - JSON API návštěvnosti: `/api/visits/today`, `/api/visits/range?days=7`
+
+Vyhledávání značky má validaci formátu (frontend + backend): musí začínat `OK` nebo `OL`, následovat minimálně jedna číslice a pak volitelně písmena/číslice (`^(OK|OL)\d+[0-9A-Z]*$`). Neplatný vstup se neodesílá na API.
 - vícejazyčné rozhraní: čeština, angličtina, němčina, francouzština (přepínač vpravo nahoře)
 
 Expirace se počítá z **maximální** platnosti na značku – prodloužené oprávnění se v datech objeví jako nový řádek s pozdějším datem, takže se prodloužené značky nepočítají jako expirující.

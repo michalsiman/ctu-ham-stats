@@ -491,15 +491,27 @@
       ["QRZ.com", `https://www.qrz.com/db/${encodeURIComponent(callsign)}`],
       ["HamQTH", `https://www.hamqth.com/search.php?callsign=${encodeURIComponent(callsign)}`],
     ];
+    const callsignRe = /^(OK|OL)\d+[0-9A-Z]*$/;
 
     form.addEventListener("submit", async e => {
       e.preventDefault();
       const q = document.getElementById("searchInput").value.trim().toUpperCase();
       if (!q) return;
+      if (!callsignRe.test(q)) {
+        box.style.display = "block";
+        box.innerHTML = `<div class="detail"><span>${T.res_invalid_callsign}</span></div>`;
+        return;
+      }
       box.style.display = "block";
       box.textContent = T.res_searching;
       try {
         const r = await fetch("/api/callsign/" + encodeURIComponent(q));
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({}));
+          const msg = err.detail ? esc(err.detail) : T.res_error;
+          box.innerHTML = `<div class="detail"><span>${msg}</span></div>`;
+          return;
+        }
         const d = await r.json();
         let badge, detail;
         if (d.status === "active") {
@@ -590,6 +602,10 @@
       <div class="label">{{ t.card_clubs }}</div>
       <div class="value">{{ summary.clubs }}</div>
     </button>
+    <button class="card card-btn" data-kind="new30" data-days="30">
+      <div class="label">{{ t.card_new_30 }}</div>
+      <div class="value">{{ summary.new_30 }}</div>
+    </button>
     <div class="card card-germany">
       <div class="label with-source">
         <span>{{ t.card_germany }}</span>
@@ -661,6 +677,7 @@
       unattended: T.panel_unattended,
       special: T.panel_special,
       club: T.panel_club,
+      new30: T.panel_new_30,
     };
     let openKey = null;
 
@@ -678,6 +695,13 @@
       grid.classList.remove("delta-mode");
       setPanelQueryParam(null);
     }
+
+    function scrollToPanelOnSmallScreen() {
+      if (window.matchMedia("(max-width: 720px)").matches) {
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+
     document.getElementById("expiringClose").addEventListener("click", closePanel);
 
     langLinks.forEach(link => link.addEventListener("click", e => {
@@ -696,6 +720,7 @@
       title.textContent = T.panel_loading;
       grid.innerHTML = "";
       panel.style.display = "block";
+      scrollToPanelOnSmallScreen();
       openKey = key;
       setPanelQueryParam(key);
       try {
@@ -703,6 +728,8 @@
           ? "/api/expiring?days=" + days
           : kind === "delta"
             ? "/api/delta"
+            : kind === "new30"
+              ? "/api/new-callsigns?days=30"
             : "/api/stations?kind=" + kind;
         const d = await (await fetch(url)).json();
         if (kind === "delta") {
@@ -739,7 +766,9 @@
           const list = [...d.callsigns].sort((a, b) => a.callsign.localeCompare(b.callsign));
           title.textContent = days
             ? T.panel_expiring.replace("{days}", days).replace("{count}", d.count)
-            : KIND_TITLES[kind].replace("{count}", d.count);
+            : kind === "new30"
+              ? KIND_TITLES[kind].replace("{days}", d.days).replace("{count}", d.count)
+              : KIND_TITLES[kind].replace("{count}", d.count);
           grid.innerHTML = list.map(x =>
             `<button type="button" class="cs-item" data-cs="${x.callsign}">
                ${x.callsign}<small>${T.until} ${fmt(x.valid_until)}</small>
