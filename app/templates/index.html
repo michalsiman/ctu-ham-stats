@@ -374,7 +374,7 @@
   .suggest-result { margin-top: 4px; }
   .suggest-list {
     display: grid !important;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     gap: 6px;
     width: 100%;
   }
@@ -382,7 +382,7 @@
     width: 100%;
   }
   @media (max-width: 720px) {
-    .suggest-list { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+    .suggest-list { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
   }
   .suggest-empty { color: var(--muted); font-size: .85rem; padding: 2px 0; }
   .suggest-error { color: var(--warn); font-size: .85rem; }
