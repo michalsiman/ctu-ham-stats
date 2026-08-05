@@ -643,6 +643,7 @@
     {{ t.footer_snapshot }} {{ summary.snapshot_date }} ·
     <a href="/api/summary">API</a> ·
     <a href="/api/expiring?days=30">{{ t.footer_expiring }}</a> ·
+    <a href="/visits{% if lang %}?lang={{ lang }}{% endif %}">{{ t.footer_visits }}</a> ·
     {{ t.footer_data }} <a href="https://data.ctu.gov.cz/dataset/individualni-opravneni-volaci-znacky-stanic-amaterske-sluzby">data.ctu.gov.cz</a> ·
     open source · <a href="https://github.com/michalsiman/ctu-ham-stats" target="_blank" rel="noopener">GitHub</a> ·
     Autor: Michal Šiman OK1SIM

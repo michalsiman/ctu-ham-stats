@@ -17,7 +17,9 @@ Aplikace se poprvé objevila v roce 2024 na mé staré doméně vlastni.cloud, k
 - stahuje víckrát denně (ČTÚ data mění i během dne), archiv se neduplikuje, pokud se CSV nezměnilo
 - ukládá snapshoty do SQLite a **diffuje je** – CSV neobsahuje datum vydání, takže přírůstky a úbytky lze zjistit jen porovnáváním snapshotů v čase
 - dashboard: aktuální počet unikátních volacích značek, denní a měsíční přírůstky/úbytky unikátních značek, počet značek expirujících do 7/30/90 dnů, graf vývoje
+- jednoduché počítadlo návštěv hlavní stránky: denní unikáty, přehled podle země, souhrn za 7 dní a 365 dní na `/visits`
 - JSON API: `/api/summary`, `/api/daily`, `/api/expiring?days=30`, `/api/stations?kind=club`, `/api/callsign/OK1SIM`, `/api/breakdown`
+- JSON API návštěvnosti: `/api/visits/today`, `/api/visits/range?days=7`
 - vícejazyčné rozhraní: čeština, angličtina, němčina, francouzština (přepínač vpravo nahoře)
 
 Expirace se počítá z **maximální** platnosti na značku – prodloužené oprávnění se v datech objeví jako nový řádek s pozdějším datem, takže se prodloužené značky nepočítají jako expirující.
@@ -46,6 +48,11 @@ Kontejner pak sám stahuje data v 6:00 a ve 14:00 (nastavitelné přes `INGEST_T
 | `CTU_CSV_URL` | URL exportu ČTÚ | zdrojové CSV |
 | `DATA_DIR` | `data` | adresář pro DB a archiv |
 | `INGEST_TIMES` | `06:00,14:00` | časy stahování (čárkou oddělené HH:MM) |
+| `VISIT_HASH_SALT` | `ctu-ham-stats` | sůl pro anonymní hash návštěvníka (IP + User-Agent) |
+
+Země návštěvníka se bere z proxy hlaviček (`CF-IPCountry`, `X-Country-Code`, `X-Vercel-IP-Country`). Bez nich se uloží `ZZ` (neznámá).
+
+Počítadlo má jednoduchý filtr botů podle `User-Agent` (crawler/spider/bot/monitoring klienti), aby metriky lépe odpovídaly reálným návštěvníkům.
 
 ## Testy
 

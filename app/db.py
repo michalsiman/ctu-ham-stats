@@ -39,6 +39,19 @@ CREATE TABLE IF NOT EXISTS app_state (
     value       TEXT NOT NULL,
     updated_at  TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS page_visits (
+    visited_on     TEXT NOT NULL,      -- ISO datum (YYYY-MM-DD)
+    visitor_hash   TEXT NOT NULL,      -- anonymizovaný otisk návštěvníka
+    country_code   TEXT NOT NULL,      -- ISO-3166-1 alpha-2, nebo ZZ
+    first_seen_at  TEXT NOT NULL,      -- UTC timestamp první návštěvy v daný den
+    last_seen_at   TEXT NOT NULL,      -- UTC timestamp poslední návštěvy v daný den
+    hits           INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (visited_on, visitor_hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_page_visits_day_country
+ON page_visits (visited_on, country_code);
 """
 
 
@@ -69,4 +82,31 @@ def set_state(conn: sqlite3.Connection, key: str, value: str, updated_at: str) -
             updated_at = excluded.updated_at
         """,
         (key, value, updated_at),
+    )
+
+
+def record_visit(
+    conn: sqlite3.Connection,
+    visited_on: str,
+    visitor_hash: str,
+    country_code: str,
+    seen_at: str,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO page_visits (
+            visited_on,
+            visitor_hash,
+            country_code,
+            first_seen_at,
+            last_seen_at,
+            hits
+        )
+        VALUES (?, ?, ?, ?, ?, 1)
+        ON CONFLICT(visited_on, visitor_hash) DO UPDATE SET
+            country_code = excluded.country_code,
+            last_seen_at = excluded.last_seen_at,
+            hits = page_visits.hits + 1
+        """,
+        (visited_on, visitor_hash, country_code, seen_at, seen_at),
     )

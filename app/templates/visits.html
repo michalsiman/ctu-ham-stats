@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ t.visits_title }} · {{ t.title }}</title>
+<style>
+  :root {
+    --bg: #14161a;
+    --panel: #1c2026;
+    --panel-edge: #2a2f37;
+    --lcd: #ffb454;
+    --lcd-dim: #8a6430;
+    --text: #c9ccd1;
+    --muted: #7d828a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    line-height: 1.45;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px 40px; }
+  .head-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  h1 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    margin: 0;
+    text-transform: uppercase;
+  }
+  .sub { color: var(--muted); font-size: .88rem; margin-top: 4px; }
+  .langs { display: flex; gap: 4px; flex-shrink: 0; }
+  .langs a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: .75rem;
+    letter-spacing: .06em;
+    padding: 4px 8px;
+    border: 1px solid var(--panel-edge);
+    border-radius: 4px;
+    background: var(--panel);
+  }
+  .langs a:hover { color: var(--lcd); border-color: var(--lcd-dim); }
+  .langs a.active { color: var(--lcd); border-color: var(--lcd-dim); background: #101317; }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin: 20px 0;
+  }
+  .cards-wide {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 6px;
+    padding: 14px 16px;
+  }
+  .label {
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--muted);
+  }
+  .value {
+    margin-top: 6px;
+    font-size: 1.9rem;
+    font-family: "Consolas", "DejaVu Sans Mono", monospace;
+    color: var(--lcd);
+    text-shadow: 0 0 12px rgba(255, 180, 84, .35);
+  }
+  .table-wrap {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-top: 16px;
+  }
+  .table-title {
+    font-size: .76rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--muted);
+    padding: 10px 12px 0;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .93rem;
+  }
+  th, td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--panel-edge);
+    text-align: left;
+  }
+  th {
+    font-size: .74rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--muted);
+    background: #171b20;
+  }
+  tr:last-child td { border-bottom: 0; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .back {
+    margin-top: 16px;
+    font-size: .85rem;
+  }
+  .back a { color: var(--lcd); text-decoration: none; }
+  .back a:hover { text-decoration: underline; }
+  @media (max-width: 640px) {
+    .head-row { flex-direction: column; align-items: stretch; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="head-row">
+    <div>
+      <h1>{{ t.visits_title }}</h1>
+      <div class="sub">{{ t.visits_subtitle }}</div>
+    </div>
+    <nav class="langs" aria-label="{{ t.lang_label }}">
+      {%- for code, name in languages.items() %}
+      <a href="?lang={{ code }}" title="{{ name }}" class="{{ 'active' if code == lang }}">{{ code | upper }}</a>
+      {%- endfor %}
+    </nav>
+  </header>
+
+  <section class="cards">
+    <div class="card">
+      <div class="label">{{ t.visits_today }}</div>
+      <div class="value">{{ today }}</div>
+    </div>
+    <div class="card">
+      <div class="label">{{ t.visits_unique }}</div>
+      <div class="value">{{ visit_stats.unique_visitors }}</div>
+    </div>
+    <div class="card">
+      <div class="label">{{ t.visits_hits }}</div>
+      <div class="value">{{ visit_stats.hits }}</div>
+    </div>
+  </section>
+
+  <section class="cards cards-wide">
+    <div class="card">
+      <div class="label">{{ t.visits_last_7 }}</div>
+      <div class="value">{{ visits_7.unique_visitors }}</div>
+      <div class="sub">{{ t.visits_hits }}: {{ visits_7.hits }}</div>
+    </div>
+    <div class="card">
+      <div class="label">{{ t.visits_last_365 }}</div>
+      <div class="value">{{ visits_365.unique_visitors }}</div>
+      <div class="sub">{{ t.visits_hits }}: {{ visits_365.hits }}</div>
+    </div>
+  </section>
+
+  <section class="table-wrap">
+    <div class="table-title">{{ t.visits_daily_7 }}</div>
+    <table>
+      <thead>
+        <tr>
+          <th>{{ t.visits_day_col }}</th>
+          <th>{{ t.visits_unique_col }}</th>
+          <th>{{ t.visits_hits_col }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if visits_7.daily %}
+          {% for row in visits_7.daily %}
+          <tr>
+            <td>{{ row.day }}</td>
+            <td class="num">{{ row.unique_visitors }}</td>
+            <td class="num">{{ row.hits }}</td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="3">0</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="table-wrap">
+    <div class="table-title">{{ t.visits_countries_today }}</div>
+    <table>
+      <thead>
+        <tr>
+          <th>{{ t.visits_country }}</th>
+          <th>{{ t.visits_unique_col }}</th>
+          <th>{{ t.visits_hits_col }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if visit_stats.countries %}
+          {% for row in visit_stats.countries %}
+          <tr>
+            <td>{{ row.country_code if row.country_code != 'ZZ' else t.visits_unknown_country }}</td>
+            <td class="num">{{ row.unique_visitors }}</td>
+            <td class="num">{{ row.hits }}</td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="3">0</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="table-wrap">
+    <div class="table-title">{{ t.visits_countries_365 }}</div>
+    <table>
+      <thead>
+        <tr>
+          <th>{{ t.visits_country }}</th>
+          <th>{{ t.visits_unique_col }}</th>
+          <th>{{ t.visits_hits_col }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if visits_365.countries %}
+          {% for row in visits_365.countries %}
+          <tr>
+            <td>{{ row.country_code if row.country_code != 'ZZ' else t.visits_unknown_country }}</td>
+            <td class="num">{{ row.unique_visitors }}</td>
+            <td class="num">{{ row.hits }}</td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="3">0</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </section>
+
+  <div class="back">
+    <a href="/{% if lang %}?lang={{ lang }}{% endif %}">← {{ t.visits_back }}</a>
+  </div>
+</div>
+</body>
+</html>

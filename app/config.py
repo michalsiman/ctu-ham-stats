@@ -24,6 +24,9 @@ DB_PATH = DATA_DIR / "hamstats.db"
 # Data ČTÚ se v průběhu dne mění, proto stahujeme víckrát.
 INGEST_TIMES = os.getenv("INGEST_TIMES", "06:00,14:00")
 
+# Sůl pro anonymizaci identifikace návštěvníka (IP + User-Agent).
+VISIT_HASH_SALT = os.getenv("VISIT_HASH_SALT", "ctu-ham-stats")
+
 
 def ingest_times() -> list[tuple[int, int]]:
     """Naparsuje INGEST_TIMES na seznam (hodina, minuta)."""

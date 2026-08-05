@@ -421,3 +421,95 @@ def station_list(conn: sqlite3.Connection, kind: str) -> list[dict]:
         return False
 
     return [dict(r) for r in rows if match(r["callsign"])]
+
+
+def visit_stats_for_day(conn: sqlite3.Connection, day: str) -> dict:
+    """Souhrn návštěv za konkrétní den včetně unikátů podle země."""
+    totals = conn.execute(
+        """
+        SELECT
+            COUNT(*) AS unique_visitors,
+            COALESCE(SUM(hits), 0) AS hits
+        FROM page_visits
+        WHERE visited_on = ?
+        """,
+        (day,),
+    ).fetchone()
+
+    countries = conn.execute(
+        """
+        SELECT
+            country_code,
+            COUNT(*) AS unique_visitors,
+            COALESCE(SUM(hits), 0) AS hits
+        FROM page_visits
+        WHERE visited_on = ?
+        GROUP BY country_code
+        ORDER BY unique_visitors DESC, hits DESC, country_code ASC
+        """,
+        (day,),
+    ).fetchall()
+
+    return {
+        "day": day,
+        "unique_visitors": totals["unique_visitors"],
+        "hits": totals["hits"],
+        "countries": [dict(row) for row in countries],
+    }
+
+
+def visit_stats_for_range(conn: sqlite3.Connection, days: int, end_day: str | None = None) -> dict:
+    """Souhrn návštěv za posledních `days` dní (včetně koncového dne)."""
+    end = date.fromisoformat(end_day) if end_day else date.today()
+    start = end - timedelta(days=days - 1)
+    start_iso = start.isoformat()
+    end_iso = end.isoformat()
+
+    totals = conn.execute(
+        """
+        SELECT
+            COUNT(DISTINCT visitor_hash) AS unique_visitors,
+            COALESCE(SUM(hits), 0) AS hits
+        FROM page_visits
+        WHERE visited_on >= ? AND visited_on <= ?
+        """,
+        (start_iso, end_iso),
+    ).fetchone()
+
+    countries = conn.execute(
+        """
+        SELECT
+            country_code,
+            COUNT(DISTINCT visitor_hash) AS unique_visitors,
+            COALESCE(SUM(hits), 0) AS hits
+        FROM page_visits
+        WHERE visited_on >= ? AND visited_on <= ?
+        GROUP BY country_code
+        ORDER BY unique_visitors DESC, hits DESC, country_code ASC
+        """,
+        (start_iso, end_iso),
+    ).fetchall()
+
+    daily = conn.execute(
+        """
+        SELECT
+            visited_on AS day,
+            COUNT(*) AS unique_visitors,
+            COALESCE(SUM(hits), 0) AS hits
+        FROM page_visits
+        WHERE visited_on >= ? AND visited_on <= ?
+        GROUP BY visited_on
+        ORDER BY visited_on ASC
+        """,
+        (start_iso, end_iso),
+    ).fetchall()
+
+    return {
+        "days": days,
+        "start_day": start_iso,
+        "end_day": end_iso,
+        "unique_visitors": totals["unique_visitors"],
+        "hits": totals["hits"],
+        "countries": [dict(row) for row in countries],
+        "daily": [dict(row) for row in daily],
+    }
