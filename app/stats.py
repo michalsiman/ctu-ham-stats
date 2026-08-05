@@ -10,6 +10,13 @@ def latest_snapshot(conn: sqlite3.Connection) -> str | None:
     return row["snapshot_date"] if row else None
 
 
+def earliest_snapshot(conn: sqlite3.Connection) -> str | None:
+    row = conn.execute(
+        "SELECT snapshot_date FROM daily_stats ORDER BY snapshot_date ASC LIMIT 1"
+    ).fetchone()
+    return row["snapshot_date"] if row else None
+
+
 def _previous_month_start(current_month_start: date) -> date:
     if current_month_start.month == 1:
         return date(current_month_start.year - 1, 12, 1)
@@ -215,8 +222,9 @@ def new_callsigns_count(conn: sqlite3.Connection, days: int) -> int | None:
     tedy podle data `first_seen` bez ohledu na to, zda jsou dnes aktivní.
     Prodloužení existující značky se sem nedostane, protože nemění `first_seen`.
     """
-    latest = latest_snapshot(conn)
-    if not latest:
+        latest = latest_snapshot(conn)
+        baseline = earliest_snapshot(conn)
+        if not latest or not baseline:
         return None
     start, end = _new_callsigns_window(latest, days)
     row = conn.execute(
@@ -225,8 +233,9 @@ def new_callsigns_count(conn: sqlite3.Connection, days: int) -> int | None:
         FROM callsigns
         WHERE first_seen >= ?
           AND first_seen <= ?
+                    AND first_seen > ?
         """,
-                (start, end),
+                (start, end, baseline),
     ).fetchone()
     return row["n"]
 
@@ -234,7 +243,8 @@ def new_callsigns_count(conn: sqlite3.Connection, days: int) -> int | None:
 def new_callsigns_list(conn: sqlite3.Connection, days: int, limit: int = 500) -> list[dict]:
     """Seznam nově vzniklých značek za posledních `days` dní."""
     latest = latest_snapshot(conn)
-    if not latest:
+    baseline = earliest_snapshot(conn)
+    if not latest or not baseline:
         return []
     start, end = _new_callsigns_window(latest, days)
     rows = conn.execute(
@@ -248,11 +258,12 @@ def new_callsigns_list(conn: sqlite3.Connection, days: int, limit: int = 500) ->
                     ON l.callsign = c.callsign
         WHERE c.first_seen >= ?
           AND c.first_seen <= ?
+                    AND c.first_seen > ?
         GROUP BY c.callsign, c.first_seen
         ORDER BY c.first_seen DESC, c.callsign ASC
         LIMIT ?
         """,
-                (start, end, limit),
+                (start, end, baseline, limit),
     ).fetchall()
     return [dict(r) for r in rows]
 
