@@ -428,6 +428,9 @@
   .cs-grid.delta-mode {
     display: block;
   }
+  .cs-grid.suggest-mode {
+    display: block;
+  }
   .cs-item {
     background: #101317;
     border: 1px solid var(--panel-edge);
@@ -778,11 +781,13 @@
       openKey = null;
       cardBtns.forEach(b => b.classList.remove("open"));
       grid.classList.remove("delta-mode");
+      grid.classList.remove("suggest-mode");
       setPanelQueryParam(null);
     }
 
     function renderSuggestPanel() {
       grid.classList.remove("delta-mode");
+      grid.classList.add("suggest-mode");
       title.textContent = T.panel_suggest;
       grid.innerHTML = `<div class="suggest-wrap">
         <form class="suggest-form" id="suggestForm">
@@ -918,6 +923,7 @@
           </div>`;
         } else {
           grid.classList.remove("delta-mode");
+          grid.classList.remove("suggest-mode");
           const list = [...d.callsigns].sort((a, b) => a.callsign.localeCompare(b.callsign));
           title.textContent = days
             ? T.panel_expiring.replace("{days}", days).replace("{count}", d.count)

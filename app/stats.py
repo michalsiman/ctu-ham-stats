@@ -436,17 +436,33 @@ def suggest_callsigns(conn: sqlite3.Connection, text: str, limit: int = 24) -> d
         ).fetchall()
     }
 
+    raw_suffixes = _candidate_suffixes(text)
+    short_suffixes = [s for s in raw_suffixes if len(s) <= 2]
+    long_suffixes = [s for s in raw_suffixes if len(s) == 3]
+    ordered_suffixes = short_suffixes + long_suffixes
+
+    available_by_suffix: list[tuple[str, list[str]]] = []
+    for suffix in ordered_suffixes:
+        digits = [d for d in "1234567890" if f"OK{d}{suffix}" not in current_callsigns]
+        if digits:
+            available_by_suffix.append((suffix, digits))
+
     suggestions: list[dict] = []
-    for suffix in _candidate_suffixes(text):
-        for digit in "1234567890":
-            callsign = f"OK{digit}{suffix}"
-            if callsign in current_callsigns:
+    round_index = 0
+    while len(suggestions) < limit:
+        progressed = False
+        for suffix, digits in available_by_suffix:
+            if round_index >= len(digits):
                 continue
-            suggestions.append({
-                "callsign": callsign,
-                "digit": digit,
-                "suffix": suffix,
-            })
+            digit = digits[round_index]
+            suggestions.append(
+                {
+                    "callsign": f"OK{digit}{suffix}",
+                    "digit": digit,
+                    "suffix": suffix,
+                }
+            )
+            progressed = True
             if len(suggestions) >= limit:
                 return {
                     "input": text,
@@ -454,6 +470,9 @@ def suggest_callsigns(conn: sqlite3.Connection, text: str, limit: int = 24) -> d
                     "count": len(suggestions),
                     "suggestions": suggestions,
                 }
+        if not progressed:
+            break
+        round_index += 1
 
     return {
         "input": text,
