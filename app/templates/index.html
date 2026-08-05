@@ -388,7 +388,12 @@
   }
   .cs-item small { display: block; color: var(--muted); font-family: inherit; font-size: .72rem; }
   .cs-item:hover { border-color: var(--lcd-dim); }
-  .delta-wrap { display: grid; gap: 12px; }
+  .delta-wrap {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    align-items: start;
+  }
   .delta-head {
     font-size: .78rem;
     letter-spacing: .08em;
@@ -402,6 +407,12 @@
     color: var(--muted);
     font-size: .85rem;
     padding: 2px 0 6px;
+  }
+  .delta-wrap .cs-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+  @media (max-width: 720px) {
+    .delta-wrap { grid-template-columns: 1fr; }
   }
   @media (max-width: 720px) {
     .breakdown { grid-template-columns: 1fr; }
