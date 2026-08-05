@@ -204,6 +204,16 @@
   .card .value small { font-size: .9rem; color: var(--lcd-dim); }
   .delta-add { color: var(--ok); }
   .delta-rem { color: var(--warn); }
+  .delta-flat { color: var(--ok); }
+  .trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .trend-arrow {
+    font-size: 1.2rem;
+    line-height: 1;
+  }
   .chart-panel {
     background: var(--panel);
     border: 1px solid var(--panel-edge);
@@ -499,8 +509,14 @@
       <div class="label">{{ t.card_delta }}</div>
       <div class="value">
         {% if summary.added is not none %}
-          <span class="delta-add">+{{ summary.added }}</span>
-          <span class="delta-rem">−{{ summary.removed }}</span>
+          {% set delta = summary.added - summary.removed %}
+          {% if delta > 0 %}
+            <span class="trend delta-add"><span class="trend-arrow">↗</span><span>+{{ delta }}</span></span>
+          {% elif delta < 0 %}
+            <span class="trend delta-rem"><span class="trend-arrow">↘</span><span>{{ delta }}</span></span>
+          {% else %}
+            <span class="trend delta-flat"><span class="trend-arrow">→</span><span>0</span></span>
+          {% endif %}
         {% else %}
           <small>{{ t.card_first_snapshot }}</small>
         {% endif %}
