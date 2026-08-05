@@ -212,6 +212,21 @@ def api_new_callsigns(days: int = Query(30, ge=1, le=730)):
     return {"days": days, "count": len(callsigns), "callsigns": callsigns}
 
 
+@app.get("/api/suggest-callsign")
+def api_suggest_callsign(text: str = Query(..., max_length=80), limit: int = Query(12, ge=1, le=20)):
+    normalized = stats.normalize_suggestion_seed(text)
+    if not normalized:
+        raise HTTPException(
+            400,
+            "Zadejte text obsahující alespoň jedno písmeno bez diakritiky nebo speciálních znaků.",
+        )
+    conn = db.connect()
+    try:
+        return stats.suggest_callsigns(conn, text, limit)
+    finally:
+        conn.close()
+
+
 @app.get("/api/callsign/{callsign}")
 def api_callsign(callsign: str):
     clean = callsign.strip().upper()

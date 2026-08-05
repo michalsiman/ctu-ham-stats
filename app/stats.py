@@ -1,6 +1,8 @@
 """Dotazy nad uloženými snapshoty."""
 import sqlite3
+import unicodedata
 from datetime import date, timedelta
+from itertools import combinations
 
 
 def latest_snapshot(conn: sqlite3.Connection) -> str | None:
@@ -15,6 +17,71 @@ def earliest_snapshot(conn: sqlite3.Connection) -> str | None:
         "SELECT snapshot_date FROM daily_stats ORDER BY snapshot_date ASC LIMIT 1"
     ).fetchone()
     return row["snapshot_date"] if row else None
+
+
+def normalize_suggestion_seed(text: str) -> str:
+    """Převede libovolný text na posloupnost velkých písmen A-Z bez diakritiky."""
+    normalized = unicodedata.normalize("NFKD", text.upper())
+    return "".join(ch for ch in normalized if "A" <= ch <= "Z")
+
+
+def _word_initials(text: str) -> str:
+    initials = []
+    for part in text.split():
+        seed = normalize_suggestion_seed(part)
+        if seed:
+            initials.append(seed[0])
+    return "".join(initials)
+
+
+def _candidate_suffixes(text: str, limit: int = 200) -> list[str]:
+    """Vrátí kandidátní suffixy o délce 1-3 znaků v deterministickém pořadí."""
+    bases = []
+    normalized = normalize_suggestion_seed(text)
+    if normalized:
+        bases.append(normalized)
+
+    initials = _word_initials(text)
+    if initials and initials not in bases:
+        bases.append(initials)
+
+    consonants = "".join(ch for ch in normalized if ch not in "AEIOUY")
+    if consonants and consonants not in bases:
+        bases.append(consonants)
+
+    reversed_normalized = normalized[::-1]
+    if reversed_normalized and reversed_normalized not in bases:
+        bases.append(reversed_normalized)
+
+    seen: set[str] = set()
+    suffixes: list[str] = []
+
+    def add(candidate: str) -> None:
+        if 1 <= len(candidate) <= 3 and candidate not in seen:
+            seen.add(candidate)
+            suffixes.append(candidate)
+
+    for base in bases:
+        if not base:
+            continue
+        for length in (3, 2, 1):
+            if len(base) >= length:
+                add(base[:length])
+                add(base[-length:])
+                for start in range(len(base) - length + 1):
+                    add(base[start:start + length])
+                    if len(suffixes) >= limit:
+                        return suffixes
+
+        source = base[:8]
+        for length in (3, 2, 1):
+            if len(source) >= length:
+                for indexes in combinations(range(len(source)), length):
+                    add("".join(source[i] for i in indexes))
+                    if len(suffixes) >= limit:
+                        return suffixes
+
+    return suffixes
 
 
 def _previous_month_start(current_month_start: date) -> date:
@@ -265,6 +332,51 @@ def new_callsigns_list(conn: sqlite3.Connection, days: int, limit: int = 500) ->
                 (start, end, baseline, limit),
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def suggest_callsigns(conn: sqlite3.Connection, text: str, limit: int = 12) -> dict:
+    """Navrhne volné značky OK{digit}{suffix} podle zadaného textu."""
+    latest = latest_snapshot(conn)
+    if not latest:
+        return {"input": text, "normalized": "", "count": 0, "suggestions": []}
+
+    normalized = normalize_suggestion_seed(text)
+    if not normalized:
+        return {"input": text, "normalized": "", "count": 0, "suggestions": []}
+
+    current_callsigns = {
+        row["callsign"]
+        for row in conn.execute(
+            "SELECT callsign FROM callsigns WHERE last_seen = ?",
+            (latest,),
+        ).fetchall()
+    }
+
+    suggestions: list[dict] = []
+    for suffix in _candidate_suffixes(text):
+        for digit in "1234567890":
+            callsign = f"OK{digit}{suffix}"
+            if callsign in current_callsigns:
+                continue
+            suggestions.append({
+                "callsign": callsign,
+                "digit": digit,
+                "suffix": suffix,
+            })
+            if len(suggestions) >= limit:
+                return {
+                    "input": text,
+                    "normalized": normalized,
+                    "count": len(suggestions),
+                    "suggestions": suggestions,
+                }
+
+    return {
+        "input": text,
+        "normalized": normalized,
+        "count": len(suggestions),
+        "suggestions": suggestions,
+    }
 
 
 def expiring_count(conn: sqlite3.Connection, days: int) -> int | None:

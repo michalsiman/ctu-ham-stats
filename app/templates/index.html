@@ -336,6 +336,50 @@
     border-bottom: 1px solid transparent;
   }
   .result .links button:hover { border-bottom-color: var(--lcd); }
+  .suggest-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .suggest-form {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+  .suggest-form input {
+    flex: 1;
+    min-width: 220px;
+    background: #101317;
+    border: 1px solid var(--panel-edge);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--lcd);
+    font-family: "Consolas", "DejaVu Sans Mono", monospace;
+    font-size: 1.02rem;
+  }
+  .suggest-form input:focus { outline: 2px solid var(--lcd-dim); }
+  .suggest-form button {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 10px 18px;
+    font-size: .9rem;
+    cursor: pointer;
+  }
+  .suggest-form button:hover { border-color: var(--lcd-dim); color: var(--lcd); }
+  .suggest-hint { color: var(--muted); font-size: .82rem; }
+  .suggest-meta { color: var(--muted); font-size: .76rem; }
+  .suggest-result { margin-top: 4px; }
+  .suggest-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 6px;
+  }
+  .suggest-list .cs-item { width: 100%; }
+  .suggest-empty { color: var(--muted); font-size: .85rem; padding: 2px 0; }
+  .suggest-error { color: var(--warn); font-size: .85rem; }
   .card-btn {
     text-align: left;
     font: inherit;
@@ -637,6 +681,10 @@
       <div class="label">{{ t.card_new_30 }}</div>
       <div class="value">{{ summary.new_30 }}</div>
     </button>
+    <button class="card card-btn" data-kind="suggest">
+      <div class="label">{{ t.card_suggest }}</div>
+      <div class="value">OK1-3</div>
+    </button>
     <div class="card card-germany">
       <div class="label with-source">
         <span>{{ t.card_germany }}</span>
@@ -727,6 +775,72 @@
       setPanelQueryParam(null);
     }
 
+    function renderSuggestPanel() {
+      grid.classList.remove("delta-mode");
+      title.textContent = T.panel_suggest;
+      grid.innerHTML = `<div class="suggest-wrap">
+        <form class="suggest-form" id="suggestForm">
+          <input id="suggestInput" placeholder="${esc(T.suggest_placeholder)}"
+                 maxlength="80" autocomplete="off" spellcheck="false"
+                 aria-label="${esc(T.suggest_label)}">
+          <button type="submit">${esc(T.suggest_button)}</button>
+        </form>
+        <div class="suggest-hint">${esc(T.suggest_hint)}</div>
+        <div class="suggest-meta" id="suggestMeta"></div>
+        <div class="suggest-result" id="suggestResult"></div>
+      </div>`;
+
+      const suggestForm = document.getElementById("suggestForm");
+      const suggestInput = document.getElementById("suggestInput");
+      const suggestMeta = document.getElementById("suggestMeta");
+      const suggestResult = document.getElementById("suggestResult");
+
+      suggestInput.focus();
+      suggestForm.addEventListener("submit", async e => {
+        e.preventDefault();
+        const text = suggestInput.value.trim();
+        if (!text) {
+          suggestMeta.textContent = "";
+          suggestResult.innerHTML = `<div class="suggest-empty">${esc(T.suggest_empty)}</div>`;
+          return;
+        }
+
+        suggestMeta.textContent = "";
+        suggestResult.textContent = T.suggest_loading;
+        try {
+          const r = await fetch("/api/suggest-callsign?text=" + encodeURIComponent(text));
+          if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            suggestResult.innerHTML = `<div class="suggest-error">${esc(err.detail || T.suggest_error)}</div>`;
+            return;
+          }
+
+          const d = await r.json();
+          if (d.normalized) {
+            suggestMeta.textContent = T.suggest_normalized.replace("{text}", d.normalized);
+          }
+
+          if (!d.suggestions.length) {
+            suggestResult.innerHTML = `<div class="suggest-empty">${esc(T.suggest_none)}</div>`;
+            return;
+          }
+
+          suggestResult.innerHTML = `<div class="suggest-list">${d.suggestions.map(x =>
+            `<button type="button" class="cs-item" data-cs="${x.callsign}">
+               ${x.callsign}<small>${esc(T.suggest_suffix)} ${x.suffix}</small>
+             </button>`).join("")}</div>`;
+
+          suggestResult.querySelectorAll(".cs-item").forEach(el => el.addEventListener("click", () => {
+            document.getElementById("searchInput").value = el.dataset.cs;
+            form.requestSubmit();
+            box.scrollIntoView({ behavior: "smooth", block: "center" });
+          }));
+        } catch {
+          suggestResult.innerHTML = `<div class="suggest-error">${esc(T.suggest_error)}</div>`;
+        }
+      });
+    }
+
     function scrollToPanelOnSmallScreen() {
       if (window.matchMedia("(max-width: 720px)").matches) {
         panel.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -754,6 +868,10 @@
       scrollToPanelOnSmallScreen();
       openKey = key;
       setPanelQueryParam(key);
+      if (kind === "suggest") {
+        renderSuggestPanel();
+        return;
+      }
       try {
         const url = days
           ? "/api/expiring?days=" + days
