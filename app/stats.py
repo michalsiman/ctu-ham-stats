@@ -32,42 +32,42 @@ def _latest_snapshot_in_range(
     return row["snapshot_date"] if row else None
 
 
-def _row_delta_between_snapshots(
+def _callsign_delta_between_snapshots(
     conn: sqlite3.Connection, newer_snapshot: str, older_snapshot: str
 ) -> tuple[int, int]:
     added = conn.execute(
         """
         SELECT COUNT(*) AS n FROM (
-            SELECT callsign, reference, valid_until
-            FROM licenses
-            WHERE last_seen = ?
+            SELECT callsign
+            FROM callsigns
+            WHERE first_seen <= ? AND last_seen >= ?
             EXCEPT
-            SELECT callsign, reference, valid_until
-            FROM licenses
-            WHERE last_seen = ?
+            SELECT callsign
+            FROM callsigns
+            WHERE first_seen <= ? AND last_seen >= ?
         )
         """,
-        (newer_snapshot, older_snapshot),
+        (newer_snapshot, newer_snapshot, older_snapshot, older_snapshot),
     ).fetchone()["n"]
     removed = conn.execute(
         """
         SELECT COUNT(*) AS n FROM (
-            SELECT callsign, reference, valid_until
-            FROM licenses
-            WHERE last_seen = ?
+            SELECT callsign
+            FROM callsigns
+            WHERE first_seen <= ? AND last_seen >= ?
             EXCEPT
-            SELECT callsign, reference, valid_until
-            FROM licenses
-            WHERE last_seen = ?
+            SELECT callsign
+            FROM callsigns
+            WHERE first_seen <= ? AND last_seen >= ?
         )
         """,
-        (older_snapshot, newer_snapshot),
+        (older_snapshot, older_snapshot, newer_snapshot, newer_snapshot),
     ).fetchone()["n"]
     return added, removed
 
 
 def summary(conn: sqlite3.Connection) -> dict | None:
-    """Aktuální stav: počty + dnešní přírůstek/úbytek + expirace."""
+    """Aktuální stav přehledů postavených na unikátních značkách."""
     latest = latest_snapshot(conn)
     if not latest:
         return None
@@ -82,7 +82,6 @@ def summary(conn: sqlite3.Connection) -> dict | None:
     return {
         "snapshot_date": latest,
         "fetched_at": stats["fetched_at"],
-        "total_rows": stats["total_rows"],
         "unique_callsigns": stats["unique_callsigns"],
         "added": stats["added"],
         "removed": stats["removed"],
@@ -140,7 +139,7 @@ def monthly_change(conn: sqlite3.Connection) -> dict | None:
     if not newer_snapshot or not older_snapshot:
         return None
 
-    added, removed = _row_delta_between_snapshots(conn, newer_snapshot, older_snapshot)
+    added, removed = _callsign_delta_between_snapshots(conn, newer_snapshot, older_snapshot)
     return {
         "snapshot_date": newer_snapshot,
         "compare_to": older_snapshot,
@@ -175,7 +174,7 @@ def daily_series(conn: sqlite3.Connection, limit: int = 365) -> list[dict]:
     """Časová řada denních statistik pro graf (vzestupně)."""
     rows = conn.execute(
         """
-        SELECT snapshot_date, total_rows, unique_callsigns, added, removed
+        SELECT snapshot_date, unique_callsigns, added, removed
         FROM daily_stats
         ORDER BY snapshot_date DESC
         LIMIT ?

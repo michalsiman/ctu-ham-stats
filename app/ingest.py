@@ -95,7 +95,11 @@ def store_snapshot(
     rows: list[tuple[str, int, str]],
     snapshot_date: date,
 ) -> dict:
-    """Uloží snapshot a spočítá denní diff. Idempotentní pro opakované spuštění."""
+    """Uloží snapshot a spočítá denní diff unikátních značek.
+
+    `added/removed` vyjadřuje změnu množiny volacích značek mezi snapshoty,
+    nikoli změnu jednotlivých licenčních řádků.
+    """
     snap = snapshot_date.isoformat()
 
     prev = conn.execute(
@@ -117,16 +121,27 @@ def store_snapshot(
             [(c, r, v, snap, snap) for c, r, v in rows],
         )
 
+        unique_set = sorted({c for c, _, _ in rows})
+        conn.executemany(
+            """
+            INSERT INTO callsigns (callsign, first_seen, last_seen)
+            VALUES (?, ?, ?)
+            ON CONFLICT(callsign)
+            DO UPDATE SET last_seen = excluded.last_seen
+            """,
+            [(c, snap, snap) for c in unique_set],
+        )
+
         total_rows = len(rows)
-        unique_callsigns = len({c for c, _, _ in rows})
+        unique_callsigns = len(unique_set)
 
         added = removed = None
         if prev_date:
             added = conn.execute(
-                "SELECT COUNT(*) AS n FROM licenses WHERE first_seen = ?", (snap,)
+                "SELECT COUNT(*) AS n FROM callsigns WHERE first_seen = ?", (snap,)
             ).fetchone()["n"]
             removed = conn.execute(
-                "SELECT COUNT(*) AS n FROM licenses WHERE last_seen = ?", (prev_date,)
+                "SELECT COUNT(*) AS n FROM callsigns WHERE last_seen = ?", (prev_date,)
             ).fetchone()["n"]
 
         conn.execute(

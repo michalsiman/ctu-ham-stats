@@ -40,17 +40,16 @@ def test_first_snapshot_has_no_diff(conn):
 def test_second_snapshot_diff(conn):
     store_snapshot(conn, load("sample_day1.csv"), date(2026, 8, 1))
     result = store_snapshot(conn, load("sample_day2.csv"), date(2026, 8, 2))
-    # přidáno: OK9NEW + prodloužená OK1BBB (nové datum platnosti)
-    assert result["added"] == 2
-    # zmizelo: OK1CCC + stará platnost OK1BBB
-    assert result["removed"] == 2
+    # unikátní značky: přibyla OK9NEW, zmizela OK1CCC
+    assert result["added"] == 1
+    assert result["removed"] == 1
 
 
 def test_ingest_is_idempotent(conn):
     store_snapshot(conn, load("sample_day1.csv"), date(2026, 8, 1))
     store_snapshot(conn, load("sample_day2.csv"), date(2026, 8, 2))
     result = store_snapshot(conn, load("sample_day2.csv"), date(2026, 8, 2))
-    assert result["added"] == 2 and result["removed"] == 2
+    assert result["added"] == 1 and result["removed"] == 1
 
 
 def test_expiring_uses_max_validity_per_callsign(conn, monkeypatch):
@@ -101,6 +100,31 @@ def test_summary(conn, monkeypatch):
     assert s["expiring_7"] == 1
     assert s["monthly_added"] == 1
     assert s["monthly_removed"] == 1
+
+
+def test_monthly_change_ignores_license_row_renewal(conn, monkeypatch):
+    """Měsíční delta nesmí reagovat na nové řádky stejné značky (prodloužení)."""
+    store_snapshot(conn, [
+        ("OK1A", 1, "2030-01-31"),
+        ("OK1B", 2, "2030-01-31"),
+    ], date(2026, 6, 30))
+    store_snapshot(conn, [
+        ("OK1A", 1, "2030-01-31"),
+        ("OK1B", 2, "2030-01-31"),
+        ("OK1B", 2, "2031-01-31"),  # prodloužení stejné značky
+    ], date(2026, 7, 31))
+
+    from app import stats as stats_module
+
+    class FakeDate(date):
+        @classmethod
+        def today(cls):
+            return cls(2026, 8, 4)
+
+    monkeypatch.setattr(stats_module, "date", FakeDate)
+    s = stats.summary(conn)
+    assert s["monthly_added"] == 0
+    assert s["monthly_removed"] == 0
 
 
 def test_callsign_lookup_states(conn, monkeypatch):

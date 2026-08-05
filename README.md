@@ -12,7 +12,7 @@ Zdroj dat: [Individuální oprávnění a volací značky stanic amatérské slu
 - denně stáhne a **archivuje** CSV export ČTÚ (surové soubory v `data/archive/`)
 - stahuje víckrát denně (ČTÚ data mění i během dne), archiv se neduplikuje, pokud se CSV nezměnilo
 - ukládá snapshoty do SQLite a **diffuje je** – CSV neobsahuje datum vydání, takže přírůstky a úbytky lze zjistit jen porovnáváním snapshotů v čase
-- dashboard: aktuální počet platných oprávnění a unikátních volacích značek, denní přírůstky/úbytky, počet značek expirujících do 30 a 90 dnů, graf vývoje
+- dashboard: aktuální počet unikátních volacích značek, denní a měsíční přírůstky/úbytky unikátních značek, počet značek expirujících do 7/30/90 dnů, graf vývoje
 - JSON API: `/api/summary`, `/api/daily`, `/api/expiring?days=30`, `/api/stations?kind=club`, `/api/callsign/OK1SIM`, `/api/breakdown`
 - vícejazyčné rozhraní: čeština, angličtina, němčina, francouzština (přepínač vpravo nahoře)
 

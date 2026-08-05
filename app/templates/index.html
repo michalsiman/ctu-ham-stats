@@ -151,18 +151,23 @@
     display: inline-flex;
     align-items: center;
     flex-shrink: 0;
+    text-transform: none;
   }
   .source-icon {
-    width: 15px;
-    height: 15px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
     border: 1px solid var(--muted);
     color: var(--muted);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: .72rem;
+    font-size: .58rem;
+    font-weight: 600;
     line-height: 1;
+    text-transform: none;
+    font-family: "Georgia", serif;
+    background: rgba(125, 130, 138, .08);
     cursor: help;
   }
   .source-popover {
@@ -468,7 +473,6 @@
           badge = `<span class="badge none">${T.status_not_found}</span>`;
           detail = `<span>${T.res_not_found}</span>`;
         }
-        const cnt = d.records ? `<div class="detail"><span>${T.res_records}</span> ${d.records.length}</div>` : "";
         const ctuForm = `<form action="${ctuSearchPath}" method="post" target="_blank">
                            <input type="hidden" name="search_block_form" value="${esc(d.callsign)}">
                            <button type="submit">${T.res_ctu}</button>
@@ -476,8 +480,8 @@
         const links = externalLinks(d.callsign)
           .map(([label, href]) => `<a href="${href}" target="_blank" rel="noopener">${label}</a>`)
           .join(" · ");
-        box.innerHTML = `<div class="cs">${d.callsign}${badge}</div>
-             <div class="detail">${detail}</div>${cnt}
+           box.innerHTML = `<div class="cs">${d.callsign}${badge}</div>
+             <div class="detail">${detail}</div>
              <div class="links"><span>${T.res_external}</span> · ${ctuForm} · ${links}</div>`;
       } catch {
         box.textContent = T.res_error;
