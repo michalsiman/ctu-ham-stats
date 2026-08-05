@@ -844,8 +844,11 @@
           }
 
           const d = await r.json();
+          const countText = T.suggest_count.replace("{count}", d.count);
           if (d.normalized) {
-            suggestMeta.textContent = T.suggest_normalized.replace("{text}", d.normalized);
+            suggestMeta.textContent = `${T.suggest_normalized.replace("{text}", d.normalized)} · ${countText}`;
+          } else {
+            suggestMeta.textContent = countText;
           }
 
           if (!d.suggestions.length) {
