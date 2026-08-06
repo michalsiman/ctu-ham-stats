@@ -666,11 +666,13 @@ def breakdown(conn: sqlite3.Connection) -> dict | None:
     prefixes: dict[str, int] = {}
     prefix_digit: dict[str, dict[str, int]] = {"OK": {}, "OL": {}}
     suffix_length: dict[str, dict[int, int]] = {"OK": {}, "OL": {}}
+    other_examples: list[str] = []
 
     for r in rows:
         m = _CALLSIGN_RE.match(r["callsign"])
         if not m:
             prefixes["ostatní"] = prefixes.get("ostatní", 0) + 1
+            other_examples.append(r["callsign"])
             continue
         prefix, digits, suffix = m.groups()
         prefixes[prefix] = prefixes.get(prefix, 0) + 1
@@ -690,6 +692,7 @@ def breakdown(conn: sqlite3.Connection) -> dict | None:
         "suffix_length": {
             p: {str(k): v[k] for k in sorted(v)} for p, v in suffix_length.items()
         },
+        "other_examples": sorted(other_examples),
     }
 
 

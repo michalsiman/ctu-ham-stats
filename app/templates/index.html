@@ -739,7 +739,7 @@
   <section class="breakdown">
     <div class="chart-panel">
       <div class="panel-title">{{ t.chart_prefix }}
-        <span class="totals">
+        <span class="totals"{% if breakdown.other_examples %} title="ostatní: {{ breakdown.other_examples | join(', ') }}"{% endif %}>
           {%- for p, n in breakdown.prefixes.items() %} {{ p }}: {{ n }}{% if not loop.last %} ·{% endif %}{% endfor -%}
         </span>
       </div>
