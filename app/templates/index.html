@@ -100,6 +100,7 @@
   .card.card-germany {
     background: #171b20;
     border-color: #262b33;
+    order: 999;
   }
   .card-btn {
     text-align: left;
@@ -724,8 +725,8 @@
     <div class="card card-germany">
       <div class="label">{{ t.card_cz_hams_per_million }}</div>
       <div class="value">
-        {% if summary.cz_hams_per_million is not none %}
-          <span class="country-count">{{ summary.cz_hams_per_million }}</span>
+        {% if summary.cz_penetration_pct is not none %}
+          <span class="country-count">{{ "%.4f"|format(summary.cz_penetration_pct) }} %</span>
         {% else %}
           <small>{{ t.card_cz_pop_na }}</small>
         {% endif %}
