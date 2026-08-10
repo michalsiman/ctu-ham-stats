@@ -317,11 +317,13 @@ def test_summary_exposes_fetch_time(conn):
 def test_parse_germany_callsigns_total():
     from app.ingest import parse_germany_callsigns_total
 
+    # Reálná stránka renderuje data přes JS; číslo je přítomné v ld+json.
     html = """
-    <div>
-      KLASSE A 50.643
-      GESAMT 61.039
-    </div>
+    <script type="application/ld+json">{"@type":"FAQPage","mainEntity":[
+      {"@type":"Question","name":"Wie viele Funkamateure?",
+       "acceptedAnswer":{"@type":"Answer","text":
+         "In Deutschland gibt es aktuell rund 61039 personengebundene Amateurfunk-Rufzeichen."}}
+    ]}</script>
     """
     assert parse_germany_callsigns_total(html) == 61039
 

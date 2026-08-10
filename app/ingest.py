@@ -27,11 +27,15 @@ def download_csv(url: str = config.CSV_URL) -> str:
 
 
 def parse_germany_callsigns_total(content: str) -> int:
-    """Vytáhne aktuální součet GESAMT ze stránky 12db statistik."""
-    match = re.search(r"GESAMT\s+([\d.]+)", content, flags=re.IGNORECASE | re.DOTALL)
+    """Vytáhne aktuální součet ze stránky 12db statistik.
+
+    Data jsou server-side renderovaná v ld+json bloku FAQPage.
+    """
+    # ld+json: "aktuell rund 61039 personengebundene Amateurfunk-Rufzeichen"
+    match = re.search(r"aktuell rund (\d+) personengebundene", content)
     if not match:
-        raise ValueError("GESAMT not found")
-    return int(match.group(1).replace(".", ""))
+        raise ValueError("total callsigns not found in ld+json")
+    return int(match.group(1))
 
 
 def fetch_germany_callsigns_total(url: str = config.DE_RUFZEICHEN_STATS_URL) -> int:
