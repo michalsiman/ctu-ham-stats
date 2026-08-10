@@ -195,12 +195,13 @@ def run_ingest(snapshot_date: date | None = None) -> dict:
         except Exception:  # noqa: BLE001
             log.exception("Nepodařilo se načíst statistiku 12db")
         else:
-            db.set_state(
-                conn,
-                "germany_callsigns_total",
-                str(germany_total),
-                datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            )
+            with conn:
+                db.set_state(
+                    conn,
+                    "germany_callsigns_total",
+                    str(germany_total),
+                    datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                )
     finally:
         conn.close()
     log.info("Ingest hotov: %s", result)
