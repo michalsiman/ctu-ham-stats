@@ -21,6 +21,12 @@ CZ_POPULATION_URL = os.getenv(
     "https://api.worldbank.org/v2/country/CZ/indicator/SP.POP.TOTL?format=json&mrv=1",
 )
 
+# World Bank API – počet obyvatel Německa (aktualizováno ročně).
+DE_POPULATION_URL = os.getenv(
+    "DE_POPULATION_URL",
+    "https://api.worldbank.org/v2/country/DE/indicator/SP.POP.TOTL?format=json&mrv=1",
+)
+
 # Adresář s daty (SQLite + archiv CSV)
 DATA_DIR = Path(os.getenv("DATA_DIR", "data"))
 ARCHIVE_DIR = DATA_DIR / "archive"

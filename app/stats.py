@@ -348,6 +348,13 @@ def summary(conn: sqlite3.Connection) -> dict | None:
     cz_population = int(cz_pop["value"]) if cz_pop else None
     unique = stats["unique_callsigns"]
     cz_penetration_pct = round(unique / cz_population * 100, 4) if cz_population else None
+    de_pop = conn.execute(
+        "SELECT value FROM app_state WHERE key = ?",
+        ("de_population",),
+    ).fetchone()
+    de_population = int(de_pop["value"]) if de_pop else None
+    germany_total = int(germany["value"]) if germany else None
+    de_penetration_pct = round(germany_total / de_population * 100, 4) if (germany_total and de_population) else None
     return {
         "snapshot_date": latest,
         "fetched_at": stats["fetched_at"],
@@ -358,9 +365,11 @@ def summary(conn: sqlite3.Connection) -> dict | None:
         "expiring_7": expiring_count(conn, 7),
         "expiring_30": expiring_count(conn, 30),
         "expiring_90": expiring_count(conn, 90),
-        "germany_callsigns_total": int(germany["value"]) if germany else None,
+        "germany_callsigns_total": germany_total,
         "cz_population": cz_population,
         "cz_penetration_pct": cz_penetration_pct,
+        "de_population": de_population,
+        "de_penetration_pct": de_penetration_pct,
         "monthly_added": monthly["added"] if monthly else None,
         "monthly_removed": monthly["removed"] if monthly else None,
         "unattended": len(station_list(conn, "unattended")),

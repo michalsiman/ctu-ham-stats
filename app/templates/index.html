@@ -704,7 +704,7 @@
       <div class="label">{{ t.card_suggest }}</div>
       <div class="value">OKx???</div>
     </button>
-    <div class="card card-germany">
+    <div class="card card-germany" style="order:1000">
       <div class="label with-source">
         <span>{{ t.card_germany }}</span>
         <span class="source-wrap" tabindex="0" aria-label="{{ t.card_germany_source }}">
@@ -729,6 +729,16 @@
           <span class="country-count">{{ "%.4f"|format(summary.cz_penetration_pct) }} %</span>
         {% else %}
           <small>{{ t.card_cz_pop_na }}</small>
+        {% endif %}
+      </div>
+    </div>
+    <div class="card card-germany">
+      <div class="label">{{ t.card_de_penetration }}</div>
+      <div class="value">
+        {% if summary.de_penetration_pct is not none %}
+          <span class="country-count">{{ "%.4f"|format(summary.de_penetration_pct) }} %</span>
+        {% else %}
+          <small>{{ t.card_de_pop_na }}</small>
         {% endif %}
       </div>
     </div>

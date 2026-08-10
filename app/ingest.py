@@ -53,6 +53,13 @@ def fetch_cz_population(url: str = config.CZ_POPULATION_URL) -> int:
     return resp.json()[1][0]["value"]
 
 
+def fetch_de_population(url: str = config.DE_POPULATION_URL) -> int:
+    """Stáhne aktuální počet obyvatel Německa z World Bank API."""
+    resp = httpx.get(url, timeout=30, follow_redirects=True)
+    resp.raise_for_status()
+    return resp.json()[1][0]["value"]
+
+
 def archive_csv(content: str, snapshot_date: date,
                 stamp: str | None = None) -> Path | None:
     """Uloží surové CSV do archivu (source of truth, umožní přepočet).
@@ -219,6 +226,18 @@ def run_ingest(snapshot_date: date | None = None) -> dict:
                     conn,
                     "cz_population",
                     str(cz_population),
+                    datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                )
+        try:
+            de_population = fetch_de_population()
+        except Exception:  # noqa: BLE001
+            log.exception("Nepodařilo se načíst počet obyvatel Německa z World Bank")
+        else:
+            with conn:
+                db.set_state(
+                    conn,
+                    "de_population",
+                    str(de_population),
                     datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 )
     finally:
