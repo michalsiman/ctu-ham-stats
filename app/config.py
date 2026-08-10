@@ -15,6 +15,12 @@ DE_RUFZEICHEN_STATS_URL = os.getenv(
     "https://www.12db.de/rufzeichen/statistik/",
 )
 
+# World Bank API – počet obyvatel ČR (aktualizováno ročně).
+CZ_POPULATION_URL = os.getenv(
+    "CZ_POPULATION_URL",
+    "https://api.worldbank.org/v2/country/CZ/indicator/SP.POP.TOTL?format=json&mrv=1",
+)
+
 # Adresář s daty (SQLite + archiv CSV)
 DATA_DIR = Path(os.getenv("DATA_DIR", "data"))
 ARCHIVE_DIR = DATA_DIR / "archive"

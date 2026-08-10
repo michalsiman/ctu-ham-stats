@@ -46,6 +46,13 @@ def fetch_germany_callsigns_total(url: str = config.DE_RUFZEICHEN_STATS_URL) -> 
     return parse_germany_callsigns_total(resp.text)
 
 
+def fetch_cz_population(url: str = config.CZ_POPULATION_URL) -> int:
+    """Stáhne aktuální počet obyvatel ČR z World Bank API."""
+    resp = httpx.get(url, timeout=30, follow_redirects=True)
+    resp.raise_for_status()
+    return resp.json()[1][0]["value"]
+
+
 def archive_csv(content: str, snapshot_date: date,
                 stamp: str | None = None) -> Path | None:
     """Uloží surové CSV do archivu (source of truth, umožní přepočet).
@@ -200,6 +207,18 @@ def run_ingest(snapshot_date: date | None = None) -> dict:
                     conn,
                     "germany_callsigns_total",
                     str(germany_total),
+                    datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                )
+        try:
+            cz_population = fetch_cz_population()
+        except Exception:  # noqa: BLE001
+            log.exception("Nepodařilo se načíst počet obyvatel ČR z World Bank")
+        else:
+            with conn:
+                db.set_state(
+                    conn,
+                    "cz_population",
+                    str(cz_population),
                     datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 )
     finally:

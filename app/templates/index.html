@@ -715,9 +715,19 @@
       </div>
       <div class="value">
         {% if summary.germany_callsigns_total is not none %}
-          <span class="country-count">{{ "{:,}".format(summary.germany_callsigns_total).replace(",", ".") }}</span>
+          <span class="country-count">{{ summary.germany_callsigns_total }}</span>
         {% else %}
           <small>{{ t.card_germany_na }}</small>
+        {% endif %}
+      </div>
+    </div>
+    <div class="card card-germany">
+      <div class="label">{{ t.card_cz_hams_per_million }}</div>
+      <div class="value">
+        {% if summary.cz_hams_per_million is not none %}
+          <span class="country-count">{{ summary.cz_hams_per_million }}</span>
+        {% else %}
+          <small>{{ t.card_cz_pop_na }}</small>
         {% endif %}
       </div>
     </div>
