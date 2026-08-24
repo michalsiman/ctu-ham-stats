@@ -5,6 +5,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
+COPY config.ini ./config.ini
 
 ENV DATA_DIR=/srv/data
 VOLUME /srv/data

@@ -7,6 +7,7 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - ./data:/srv/data
+      - ./config.ini:/srv/app/config.ini:ro
     environment:
       - TZ=Europe/Prague
       # časy stahování dat ČTÚ (data se během dne mění)
