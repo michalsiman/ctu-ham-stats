@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import config, db, i18n, ingest, stats
+from . import config, db, i18n, ingest, masking, stats
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -119,9 +119,9 @@ def index(request: Request, lang: str | None = None):
             log.exception("Nepodařilo se zapsat návštěvu")
 
         data = {
-            "summary": stats.summary(conn),
-            "series": stats.daily_series(conn),
-            "breakdown": stats.breakdown(conn),
+            "summary": masking.mask_data(stats.summary(conn)),
+            "series": masking.mask_data(stats.daily_series(conn)),
+            "breakdown": masking.mask_data(stats.breakdown(conn)),
             "t": i18n.translations(chosen),
             "lang": chosen,
             "languages": i18n.LANGUAGES,
@@ -143,14 +143,14 @@ def api_summary():
         conn.close()
     if result is None:
         raise HTTPException(404, "Zatím žádná data – spusťte ingest.")
-    return result
+    return masking.mask_data(result)
 
 
 @app.get("/api/daily")
 def api_daily(limit: int = Query(365, ge=1, le=3650)):
     conn = db.connect()
     try:
-        return stats.daily_series(conn, limit)
+        return masking.mask_data(stats.daily_series(conn, limit))
     finally:
         conn.close()
 
@@ -164,18 +164,18 @@ def api_delta():
         conn.close()
     if result is None:
         raise HTTPException(404, "Zatím žádná data – spusťte ingest.")
-    return result
+    return masking.mask_data(result)
 
 
 @app.get("/api/expiring")
 def api_expiring(days: int = Query(30, ge=1, le=730)):
     conn = db.connect()
     try:
-        return {
+        return masking.mask_data({
             "days": days,
             "count": stats.expiring_count(conn, days),
             "callsigns": stats.expiring_list(conn, days),
-        }
+        })
     finally:
         conn.close()
 
@@ -189,7 +189,7 @@ def api_breakdown():
         conn.close()
     if result is None:
         raise HTTPException(404, "Zatím žádná data – spusťte ingest.")
-    return result
+    return masking.mask_data(result)
 
 
 @app.get("/api/stations")
@@ -199,7 +199,7 @@ def api_stations(kind: str = Query(..., pattern="^(unattended|special|club)$")):
         stations = stats.station_list(conn, kind)
     finally:
         conn.close()
-    return {"kind": kind, "count": len(stations), "callsigns": stations}
+    return masking.mask_data({"kind": kind, "count": len(stations), "callsigns": stations})
 
 
 @app.get("/api/new-callsigns")
@@ -209,7 +209,7 @@ def api_new_callsigns(days: int = Query(30, ge=1, le=730)):
         callsigns = stats.new_callsigns_list(conn, days)
     finally:
         conn.close()
-    return {"days": days, "count": len(callsigns), "callsigns": callsigns}
+    return masking.mask_data({"days": days, "count": len(callsigns), "callsigns": callsigns})
 
 
 @app.get("/api/suggest-callsign")
@@ -226,7 +226,7 @@ def api_suggest_callsign(
         )
     conn = db.connect()
     try:
-        return stats.suggest_callsigns(conn, text, limit, digit)
+        return masking.mask_data(stats.suggest_callsigns(conn, text, limit, digit))
     finally:
         conn.close()
 
@@ -243,7 +243,7 @@ def api_callsign(callsign: str):
         )
     conn = db.connect()
     try:
-        return stats.callsign_lookup(conn, clean)
+        return masking.mask_data(stats.callsign_lookup(conn, clean))
     finally:
         conn.close()
 

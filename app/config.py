@@ -1,6 +1,18 @@
 """Konfigurace aplikace. Vše lze přepsat proměnnými prostředí."""
+import configparser
 import os
 from pathlib import Path
+
+# Volitelný config.ini (v kořeni projektu), proměnné prostředí mají přednost.
+CONFIG_INI_PATH = Path(os.getenv("CONFIG_INI_PATH", Path(__file__).resolve().parent.parent / "config.ini"))
+
+_ini = configparser.ConfigParser()
+if CONFIG_INI_PATH.is_file():
+    _ini.read(CONFIG_INI_PATH, encoding="utf-8")
+
+
+def _ini_get(section: str, option: str, fallback: str) -> str:
+    return _ini.get(section, option, fallback=fallback)
 
 # URL denního CSV exportu ČTÚ (otevřená data, aktualizace denně ~05:00)
 CSV_URL = os.getenv(
@@ -38,6 +50,20 @@ INGEST_TIMES = os.getenv("INGEST_TIMES", "06:00,14:00")
 
 # Sůl pro anonymizaci identifikace návštěvníka (IP + User-Agent).
 VISIT_HASH_SALT = os.getenv("VISIT_HASH_SALT", "ctu-ham-stats")
+
+# Maskování vybrané volací značky (kdekoli v aplikaci) na náhradní text.
+# Nastavuje se v config.ini (sekce [callsign_mask]) nebo proměnnými prostředí.
+MASK_CALLSIGN_ENABLED = os.getenv(
+    "MASK_CALLSIGN_ENABLED", _ini_get("callsign_mask", "enabled", "false")
+).strip().lower() in ("1", "true", "yes", "on")
+
+MASK_CALLSIGN_VALUE = os.getenv(
+    "MASK_CALLSIGN_VALUE", _ini_get("callsign_mask", "callsign", "OL60UFM")
+).strip().upper()
+
+MASK_CALLSIGN_REPLACEMENT = os.getenv(
+    "MASK_CALLSIGN_REPLACEMENT", _ini_get("callsign_mask", "replacement", "neznámá")
+)
 
 
 def ingest_times() -> list[tuple[int, int]]:
