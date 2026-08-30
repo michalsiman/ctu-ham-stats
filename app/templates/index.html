@@ -390,7 +390,16 @@
     max-height: 320px;
     overflow-y: auto;
     padding-right: 4px;
+    scrollbar-width: thin;                       /* Firefox */
+    scrollbar-color: var(--panel-edge) transparent;
   }
+  .suggest-list::-webkit-scrollbar { width: 8px; }
+  .suggest-list::-webkit-scrollbar-track { background: transparent; }
+  .suggest-list::-webkit-scrollbar-thumb {
+    background: var(--panel-edge);
+    border-radius: 4px;
+  }
+  .suggest-list::-webkit-scrollbar-thumb:hover { background: var(--lcd-dim); }
   .suggest-list .cs-item {
     width: 100%;
   }
