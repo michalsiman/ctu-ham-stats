@@ -843,6 +843,9 @@
             ${"0123456789".split("").map(d => `<option value="${d}">OK${d}</option>`).join("")}
           </select>
           <label class="suggest-contest">
+            <input type="checkbox" id="suggestContains"> ${esc(T.suggest_contains_label)}
+          </label>
+          <label class="suggest-contest">
             <input type="checkbox" id="suggestContest"> ${esc(T.suggest_contest_label)}
           </label>
           <button type="submit">${esc(T.suggest_button)}</button>
@@ -857,6 +860,7 @@
       const suggestInput = document.getElementById("suggestInput");
       const suggestDigit = document.getElementById("suggestDigit");
       const suggestContest = document.getElementById("suggestContest");
+      const suggestContains = document.getElementById("suggestContains");
       const suggestMeta = document.getElementById("suggestMeta");
       const suggestResult = document.getElementById("suggestResult");
 
@@ -877,10 +881,18 @@
         if (disable && suggestDigit.value === "0") suggestDigit.value = "";
       }
       suggestPrefix.addEventListener("change", () => { refreshDigitLabels(); refreshZeroOption(); });
-      // v závodním režimu se text nezadává
+      // závodní a „v příponě“ se vylučují; v závodním režimu se text nezadává
       suggestContest.addEventListener("change", () => {
+        if (suggestContest.checked) suggestContains.checked = false;
         suggestInput.disabled = suggestContest.checked;
         if (suggestContest.checked) suggestInput.value = "";
+        refreshZeroOption();
+      });
+      suggestContains.addEventListener("change", () => {
+        if (suggestContains.checked) {
+          suggestContest.checked = false;
+          suggestInput.disabled = false;
+        }
         refreshZeroOption();
       });
 
@@ -890,6 +902,7 @@
         const text = suggestInput.value.trim();
         const prefix = suggestPrefix.value;
         const contest = suggestContest.checked;
+        const contains = suggestContains.checked;
         if (!contest && !text) {
           suggestMeta.textContent = "";
           suggestResult.innerHTML = `<div class="suggest-empty">${esc(T.suggest_empty)}</div>`;
@@ -900,8 +913,12 @@
         suggestResult.textContent = T.suggest_loading;
         try {
           const query = new URLSearchParams({ prefix });
-          if (contest) query.set("contest", "true");
-          else query.set("text", text);
+          if (contest) {
+            query.set("contest", "true");
+          } else {
+            query.set("text", text);
+            if (contains) query.set("contains", "true");
+          }
           const selectedDigit = suggestDigit.value;
           if (selectedDigit) query.set("digit", selectedDigit);
           const r = await fetch("/api/suggest-callsign?" + query.toString());

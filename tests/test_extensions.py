@@ -116,6 +116,35 @@ def test_contest_ok_excludes_digit_zero(conn):
     assert stats.suggest_contest_callsigns(conn, "OK", "0")["count"] == 0  # explicitní 0 → prázdno
 
 
+def test_suffixes_containing_start_and_end():
+    s = stats._suffixes_containing("AA")
+    assert "AA" in s              # přesně
+    assert "AAB" in s             # začíná AA
+    assert "BAA" in s             # končí AA
+    assert all("AA" in x and len(x) <= 3 for x in s)
+    assert len(s) == 1 + 26 + 26 - 1  # AA + AA? + ?AA, mínus duplicitní AAA
+    assert stats._suffixes_containing("ABC") == ["ABC"]  # 3 písmena → jen přesně
+    assert stats._suffixes_containing("ABCD") == []      # >3 → nic
+
+
+def test_suggest_by_suffix_contains(conn):
+    store_snapshot(conn, [("OK1AA", 1, "2030-01-01")], date(2026, 8, 1))  # obsazená
+    r = stats.suggest_by_suffix_contains(conn, "AA", "OK", None, limit=1000)
+    calls = {s["callsign"] for s in r["suggestions"]}
+    assert r["mode"] == "suffix_contains"
+    assert all("AA" in s["suffix"] for s in r["suggestions"])  # každá přípona obsahuje AA
+    assert "OK1AA" not in calls        # obsazená vynechána
+    assert "OK2AA" in calls            # jiná číslice volná
+    assert "OK1AAB" in calls           # začíná AA
+    assert "OK1BAA" in calls           # končí AA
+    assert all("freedom" in s for s in r["suggestions"])  # barva volnosti i tady
+    # prefix OL a filtr číslice
+    r5 = stats.suggest_by_suffix_contains(conn, "AA", "OL", "5", limit=1000)
+    assert all(c["callsign"].startswith("OL5") for c in r5["suggestions"])
+    # více než 3 písmena → prázdno
+    assert stats.suggest_by_suffix_contains(conn, "ABCD", "OK")["count"] == 0
+
+
 def test_suggestions_carry_freedom_status(conn):
     # OK1B nikdy nebyla; OK1C propadla nedávno (ochrana běží); OK1D dávno (po lhůtě)
     today = date.today()

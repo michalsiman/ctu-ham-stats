@@ -24,19 +24,29 @@ def suggest_callsign(
     prefix: str = "OK",
     digit: str | None = None,
     contest: bool = False,
+    contains: bool = False,
     limit: int = 20,
 ) -> dict:
     """Navrhne volné volací značky OK/OL.
 
-    Běžně skládá kandidáty z písmen zadaného textu. Při `contest=True` místo
-    toho vypíše volné závodní značky tvaru PREFIX + číslice + 1 písmeno
-    (např. OK1A, OL5T); `text` se pak neřeší. `digit` omezí návrh na jednu
-    číslici.
+    Režimy (vzájemně výlučné):
+    - výchozí: skládá kandidáty z písmen zadaného `text` (např. jméno).
+    - `contest=True`: volné závodní značky PREFIX + číslice + 1 písmeno
+      (např. OK1A, OL5T); `text` se neřeší.
+    - `contains=True`: volné značky, jejichž přípona (do 3 písmen) OBSAHUJE
+      `text` (např. AA → OK1AA, OK1AAB, OK1BAA).
+    `digit` omezí návrh na jednu číslici.
+
+    Každý návrh nese `freedom`: never_used (jistě volná) / protection_elapsed
+    (po 5leté ochranné lhůtě) / recently_lapsed (lhůta běží, původní držitel
+    může obnovit) – odhad z historie, ne jistota.
     """
     conn = db.connect()
     try:
         if contest:
             result = stats.suggest_contest_callsigns(conn, prefix, digit, limit)
+        elif contains:
+            result = stats.suggest_by_suffix_contains(conn, text, prefix, digit, limit)
         else:
             result = stats.suggest_callsigns(conn, text, limit, digit, prefix)
         return masking.mask_data(result)

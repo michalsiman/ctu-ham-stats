@@ -22,7 +22,7 @@ Aplikace se poprvé objevila v roce 2024 na mé staré doméně vlastni.cloud, k
 - jednoduché počítadlo návštěv hlavní stránky: denní unikáty, přehled podle země, souhrn za 7 dní a 365 dní na `/visits`
 - JSON API: `/api/summary`, `/api/daily`, `/api/expiring?days=30`, `/api/stations?kind=club`, `/api/callsign/OK1SIM`, `/api/breakdown`
 - JSON API nových značek: `/api/new-callsigns?days=30`
-- JSON API návrhů značek: `/api/suggest-callsign?text=Novak` (parametry `prefix=OK|OL`, `contest=true` pro závodní short cally)
+- JSON API návrhů značek: `/api/suggest-callsign?text=Novak` (parametry `prefix=OK|OL`, `contest=true` pro závodní short cally, `contains=true` pro značky s textem v příponě). Každý návrh nese `freedom` (never_used / protection_elapsed / recently_lapsed) pro odlišení skutečně volných značek od těch, u nichž ještě běží ochranná lhůta.
 - JSON API kandidátů na uvolnění po ochranné lhůtě: `/api/free-after-protection?years=5` – **pravděpodobně volné, ne jistota** (viz níže)
 - JSON API návštěvnosti: `/api/visits/today`, `/api/visits/range?days=7`
 - **MCP server** na `/mcp` (streamable HTTP, read-only) – AI agent se připojí a dotazuje přes nástroje `overview`, `recent_changes`, `daily_trend`, `suggest_callsign`, `expiring_soon`, `free_after_protection`, `callsign_lookup`

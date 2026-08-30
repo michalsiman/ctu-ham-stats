@@ -3,7 +3,7 @@ import re
 import sqlite3
 import unicodedata
 from datetime import date, timedelta
-from itertools import combinations
+from itertools import combinations, product
 
 # Standardní OK/OL značka: jedna číslice a 1–4 písmen v příponě.
 # Příležitostné/eventové značky mívají víc číslic nebo delší/číselnou příponu
@@ -657,6 +657,83 @@ def suggest_contest_callsigns(
                 return _finish()
 
     return _finish()
+
+
+_A_TO_Z = [chr(c) for c in range(ord("A"), ord("Z") + 1)]
+_SUFFIX_DIGIT_ORDER = "1234567890"  # 1–9 pak 0 (0 bývá klubové/speciální)
+
+
+def _suffixes_containing(fragment: str, max_len: int = 3) -> list[str]:
+    """Všechny přípony délky ≤ max_len obsahující `fragment` jako souvislý úsek.
+
+    Např. 'AA' → ['AA', 'AAA', 'AAB', …, 'BAA', …] (přesně, začíná i končí).
+    """
+    n = len(fragment)
+    if n == 0 or n > max_len:
+        return []
+    out: set[str] = {fragment}
+    for total in range(n + 1, max_len + 1):
+        extra = total - n
+        for before in range(extra + 1):
+            after = extra - before
+            for pre in product(_A_TO_Z, repeat=before):
+                for suf in product(_A_TO_Z, repeat=after):
+                    out.add("".join(pre) + fragment + "".join(suf))
+    return sorted(out, key=lambda s: (len(s), s))
+
+
+def suggest_by_suffix_contains(
+    conn: sqlite3.Connection,
+    text: str,
+    prefix: str = "OK",
+    digit: str | None = None,
+    limit: int = 48,
+    protection_years: int = 5,
+) -> dict:
+    """Volné značky, jejichž přípona (do 3 písmen) OBSAHUJE zadaný text.
+
+    Text se bere jako souvislý úsek přípony, takže se najdou značky, které jím
+    začínají i končí (např. 'AA' → OK1AA, OK1AAB, OK1BAA). Každý návrh nese
+    `freedom` stejně jako ostatní návrhy.
+    """
+    if prefix not in ("OK", "OL"):
+        raise ValueError("prefix musí být OK nebo OL")
+
+    normalized = normalize_suggestion_seed(text)
+    latest = latest_snapshot(conn)
+    invalid_digit = digit is not None and (len(digit) != 1 or digit not in "0123456789")
+    if not latest or not normalized or len(normalized) > 3 or invalid_digit:
+        return {"input": text, "normalized": normalized, "fragment": normalized,
+                "prefix": prefix, "digit_filter": digit, "mode": "suffix_contains",
+                "count": 0, "suggestions": []}
+
+    current_callsigns = {
+        row["callsign"]
+        for row in conn.execute(
+            "SELECT callsign FROM callsigns WHERE last_seen = ?",
+            (latest,),
+        ).fetchall()
+    }
+
+    candidate_suffixes = _suffixes_containing(normalized, 3)
+    digits = [digit] if digit else list(_SUFFIX_DIGIT_ORDER)
+
+    suggestions: list[dict] = []
+    for suffix in candidate_suffixes:
+        for d in digits:
+            callsign = f"{prefix}{d}{suffix}"
+            if callsign in current_callsigns:
+                continue
+            suggestions.append({"callsign": callsign, "digit": d, "suffix": suffix})
+
+    # kratší přípony první, pak číslice v pořadí 1–9,0, pak abecedně
+    suggestions.sort(key=lambda s: (len(s["suffix"]), _SUFFIX_DIGIT_ORDER.index(s["digit"]), s["suffix"]))
+    suggestions = suggestions[:limit]
+    _annotate_freedom(conn, suggestions, protection_years)
+
+    return {"input": text, "normalized": normalized, "fragment": normalized,
+            "prefix": prefix, "digit_filter": digit, "mode": "suffix_contains",
+            "count": len(suggestions), "suggestions": suggestions}
 
 
 def freed_after_protection(

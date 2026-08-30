@@ -237,6 +237,7 @@ def api_suggest_callsign(
     prefix: str = Query("OK", pattern="^(OK|OL)$"),
     digit: str | None = Query(None, pattern="^[0-9]$"),
     contest: bool = Query(False),
+    contains: bool = Query(False),
     limit: int = Query(48, ge=1, le=260),
 ):
     conn = db.connect()
@@ -250,6 +251,11 @@ def api_suggest_callsign(
                 400,
                 "Zadejte text obsahující alespoň jedno písmeno bez diakritiky nebo speciálních znaků.",
             )
+        if contains:
+            # režim „v příponě“: volné značky, jejichž přípona (do 3 písmen) obsahuje text
+            if len(normalized) > 3:
+                raise HTTPException(400, "Pro hledání v příponě zadejte nejvýš 3 písmena.")
+            return masking.mask_data(stats.suggest_by_suffix_contains(conn, text, prefix, digit, limit))
         return masking.mask_data(stats.suggest_callsigns(conn, text, limit, digit, prefix))
     finally:
         conn.close()
