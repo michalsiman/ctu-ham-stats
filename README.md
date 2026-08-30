@@ -18,7 +18,12 @@ Aplikace se poprvé objevila v roce 2024 na mé staré doméně vlastni.cloud, k
 - ukládá snapshoty do SQLite a **diffuje je** – CSV neobsahuje datum vydání, takže přírůstky a úbytky lze zjistit jen porovnáváním snapshotů v čase
 - dashboard: aktuální počet unikátních volacích značek, denní a měsíční přírůstky/úbytky unikátních značek, počet značek expirujících do 7/30/90 dnů, graf vývoje
 - dashboard navíc obsahuje blok „nové značky za 30 dní“ (dle `first_seen` v tabulce `callsigns`, tedy skutečně nově vzniklé unikátní značky, ne pouhé prodloužení)
-- dashboard navíc obsahuje blok „Navrhnout novou značku“, který z textu skládá kandidáty ve tvaru `OK` + 1 číslice + 1 až 3 písmena a vybírá volné návrhy z aktuálních dat; přepínačem lze zvolit prefix `OK`/`OL` a **závodní režim**, který vypíše volné short cally `OK`/`OL` + 1 číslice + 1 písmeno (např. `OK1A`)
+- dashboard navíc obsahuje blok „Navrhnout novou značku“ se třemi režimy (výběr prefixu `OK`/`OL`, volitelně konkrétní číslice):
+  - **ze jména** – skládá příponu z písmen textu (`Novák` → `OK1NOV`…)
+  - **v sufixu** – volné značky, jejichž přípona (do 3 písmen) obsahuje zadaný text (`AA` → `OK1AA`, `OK1AAB`, `OK1BAA`)
+  - **závodní** – volné short cally `OK`/`OL` + 1 číslice + 1 písmeno (`OK1A`; číslice `0` jen pro `OL`)
+
+  Každý návrh je barevně odlišen podle volnosti: nikdy nepřidělená / po 5leté ochranné lhůtě / nedávno propadlá (odhad z historie, ne jistota)
 - jednoduché počítadlo návštěv hlavní stránky: denní unikáty, přehled podle země, souhrn za 7 dní a 365 dní na `/visits`
 - JSON API: `/api/summary`, `/api/daily`, `/api/expiring?days=30`, `/api/stations?kind=club`, `/api/callsign/OK1SIM`, `/api/breakdown`
 - JSON API nových značek: `/api/new-callsigns?days=30`
@@ -81,6 +86,25 @@ Země návštěvníka se bere z proxy hlaviček (`CF-IPCountry`, `X-Country-Code
 
 Počítadlo má jednoduchý filtr botů podle `User-Agent` (crawler/spider/bot/monitoring klienti), aby metriky lépe odpovídaly reálným návštěvníkům.
 
+## MCP server
+
+Aplikace vystavuje **MCP server** (Model Context Protocol) na `/mcp` – streamable HTTP,
+čistě pull, read-only. AI agent se připojí a dotazuje statistiky přes nástroje:
+
+| Nástroj | Popis |
+|---|---|
+| `overview` | celkový přehled (jako `/api/summary`) |
+| `recent_changes` | poslední změna: přibylo/ubylo značek a jejich seznam |
+| `daily_trend` | časová řada denních statistik za N dní |
+| `suggest_callsign` | návrh volných značek (režimy: ze jména / `contains` v sufixu / `contest`), s polem `freedom` |
+| `expiring_soon` | značky expirující do N dnů |
+| `free_after_protection` | kandidáti na uvolnění po ochranné lhůtě (`confidence: candidate`) |
+| `callsign_lookup` | historie a stav konkrétní značky |
+
+Vyžaduje balíček `mcp` (v requirements). Když chybí nebo má nekompatibilní API, aplikace
+nastartuje i bez `/mcp`. Žádný push/webhook – vyhodnocení událostí (např. hlídání
+`free_after_protection`) si řeší agent sám.
+
 ## Testy
 
 ```bash
@@ -100,6 +124,11 @@ klíči jako `cs`; chybějící klíče se automaticky doplní z češtiny. Test
 - CSV obsahuje sloupce `ID, Volací značka, Číslo reference, Platnost do` – nic víc (žádné datum vydání, třída, ani osobní údaje)
 - jedna značka může mít víc řádků (víc oprávnění / prodloužení)
 - historie se zpětně nedá dohnat – proto archiv od prvního dne
+
+## Autoři
+
+- Michal Šiman (OK1SIM)
+- Ondřej Koloničný (OK1CDJ)
 
 ## Licence
 
