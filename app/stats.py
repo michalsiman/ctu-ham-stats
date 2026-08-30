@@ -561,8 +561,11 @@ def suggest_contest_callsigns(
     """Vypíše volné závodní značky tvaru {prefix}{číslice}{1 písmeno}.
 
     Na rozdíl od `suggest_callsigns` se neodvozuje z textu, ale enumeruje
-    všechny kombinace `^(OK|OL)\\d[A-Z]$` a vrací jen ty, které nejsou v
+    všechny kombinace `^(OK|OL)[1-9][A-Z]$` a vrací jen ty, které nejsou v
     posledním snapshotu (tedy pravděpodobně volné short cally pro závody).
+
+    Číslice 0 je vyhrazená pro klubové/speciální stanice, závodní short call
+    `OK0`/`OL0` + 1 písmeno neexistuje, proto se vylučuje.
     """
     if prefix not in ("OK", "OL"):
         raise ValueError("prefix musí být OK nebo OL")
@@ -584,7 +587,8 @@ def suggest_contest_callsigns(
         ).fetchall()
     }
 
-    digits = [digit] if digit else list("0123456789")
+    # 0 je pro klubové/speciální stanice, ne pro závodní short cally
+    digits = [d for d in ([digit] if digit else list("123456789")) if d != "0"]
     letters = [chr(c) for c in range(ord("A"), ord("Z") + 1)]
 
     suggestions: list[dict] = []

@@ -858,10 +858,15 @@
         });
       }
       suggestPrefix.addEventListener("change", refreshDigitLabels);
-      // v závodním režimu se text nezadává
+      // v závodním režimu se text nezadává a číslice 0 (klubové/speciální) nedává smysl
+      const zeroOption = [...suggestDigit.options].find(o => o.value === "0");
       suggestContest.addEventListener("change", () => {
         suggestInput.disabled = suggestContest.checked;
         if (suggestContest.checked) suggestInput.value = "";
+        if (zeroOption) {
+          zeroOption.disabled = suggestContest.checked;
+          if (suggestContest.checked && suggestDigit.value === "0") suggestDigit.value = "";
+        }
       });
 
       suggestInput.focus();

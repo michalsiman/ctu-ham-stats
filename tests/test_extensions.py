@@ -107,6 +107,16 @@ def test_contest_prefix_ol_and_digit_filter(conn):
     assert all(c.startswith("OL5") for c in calls)
 
 
+def test_contest_excludes_digit_zero(conn):
+    store_snapshot(conn, [("OK1A", 1, "2030-01-01")], date(2026, 8, 1))
+    # 0 je pro klubové/speciální stanice – žádné OK0x/OL0x závodní návrhy
+    r = stats.suggest_contest_callsigns(conn, "OK", limit=1000)
+    assert not any(s["callsign"].startswith("OK0") for s in r["suggestions"])
+    assert r["count"] == 9 * 26 - 1  # 1..9 × A..Z, minus obsazené OK1A
+    # explicitní digit=0 nevrátí nic
+    assert stats.suggest_contest_callsigns(conn, "OK", "0")["count"] == 0
+
+
 # --- 2. kandidáti na uvolnění po ochranné lhůtě ---
 
 def test_add_years_handles_leap_day():
