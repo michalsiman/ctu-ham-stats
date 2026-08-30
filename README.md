@@ -73,6 +73,8 @@ Den s velkou mezerou k předchozímu snapshotu (backfill / první reálný inges
 má v `/api/daily` `added/removed = null` a `reconstructed: true`, aby jednorázový
 přeskok nezkreslil denní přírůstkovou křivku.
 
+Podrobný postup (pořadí, čistá vs. běžící DB, ověření) je v [docs/BACKFILL.md](docs/BACKFILL.md).
+
 ## Konfigurace
 
 | Proměnná | Výchozí | Popis |
