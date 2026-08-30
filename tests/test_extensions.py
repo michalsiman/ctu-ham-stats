@@ -107,14 +107,24 @@ def test_contest_prefix_ol_and_digit_filter(conn):
     assert all(c.startswith("OL5") for c in calls)
 
 
-def test_contest_excludes_digit_zero(conn):
+def test_contest_ok_excludes_digit_zero(conn):
     store_snapshot(conn, [("OK1A", 1, "2030-01-01")], date(2026, 8, 1))
-    # 0 je pro klubové/speciální stanice – žádné OK0x/OL0x závodní návrhy
+    # OK0 + 1 písmeno neexistuje (klubové/speciální stanice)
     r = stats.suggest_contest_callsigns(conn, "OK", limit=1000)
     assert not any(s["callsign"].startswith("OK0") for s in r["suggestions"])
     assert r["count"] == 9 * 26 - 1  # 1..9 × A..Z, minus obsazené OK1A
-    # explicitní digit=0 nevrátí nic
-    assert stats.suggest_contest_callsigns(conn, "OK", "0")["count"] == 0
+    assert stats.suggest_contest_callsigns(conn, "OK", "0")["count"] == 0  # explicitní 0 → prázdno
+
+
+def test_contest_ol_allows_digit_zero(conn):
+    store_snapshot(conn, [("OK1A", 1, "2030-01-01")], date(2026, 8, 1))
+    # OL0 + 1 písmeno je platné
+    r = stats.suggest_contest_callsigns(conn, "OL", limit=1000)
+    calls = {s["callsign"] for s in r["suggestions"]}
+    assert "OL0A" in calls
+    assert r["count"] == 10 * 26  # 0..9 × A..Z, nic obsazené (OK1A je jiný prefix)
+    r0 = stats.suggest_contest_callsigns(conn, "OL", "0")
+    assert r0["count"] == 26 and all(c["callsign"].startswith("OL0") for c in r0["suggestions"])
 
 
 # --- 2. kandidáti na uvolnění po ochranné lhůtě ---

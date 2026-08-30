@@ -850,6 +850,7 @@
       const suggestMeta = document.getElementById("suggestMeta");
       const suggestResult = document.getElementById("suggestResult");
 
+      const zeroOption = [...suggestDigit.options].find(o => o.value === "0");
       // popisky číslic reflektují zvolený prefix (OK0.. / OL0..)
       function refreshDigitLabels() {
         const p = suggestPrefix.value;
@@ -857,16 +858,20 @@
           if (opt.value) opt.textContent = p + opt.value;
         });
       }
-      suggestPrefix.addEventListener("change", refreshDigitLabels);
-      // v závodním režimu se text nezadává a číslice 0 (klubové/speciální) nedává smysl
-      const zeroOption = [...suggestDigit.options].find(o => o.value === "0");
+      // OK0 + 1 písmeno neexistuje (klubové/speciální stanice), OL0 ano –
+      // v závodním režimu zakázat 0 jen u prefixu OK
+      function refreshZeroOption() {
+        if (!zeroOption) return;
+        const disable = suggestContest.checked && suggestPrefix.value === "OK";
+        zeroOption.disabled = disable;
+        if (disable && suggestDigit.value === "0") suggestDigit.value = "";
+      }
+      suggestPrefix.addEventListener("change", () => { refreshDigitLabels(); refreshZeroOption(); });
+      // v závodním režimu se text nezadává
       suggestContest.addEventListener("change", () => {
         suggestInput.disabled = suggestContest.checked;
         if (suggestContest.checked) suggestInput.value = "";
-        if (zeroOption) {
-          zeroOption.disabled = suggestContest.checked;
-          if (suggestContest.checked && suggestDigit.value === "0") suggestDigit.value = "";
-        }
+        refreshZeroOption();
       });
 
       suggestInput.focus();
