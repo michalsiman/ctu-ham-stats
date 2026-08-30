@@ -821,6 +821,10 @@
       title.textContent = T.panel_suggest;
       grid.innerHTML = `<div class="suggest-wrap">
         <form class="suggest-form" id="suggestForm">
+          <select id="suggestPrefix" aria-label="${esc(T.suggest_prefix_label)}">
+            <option value="OK">OK</option>
+            <option value="OL">OL</option>
+          </select>
           <input id="suggestInput" placeholder="${esc(T.suggest_placeholder)}"
                  maxlength="80" autocomplete="off" spellcheck="false"
                  aria-label="${esc(T.suggest_label)}">
@@ -828,6 +832,9 @@
             <option value="">${esc(T.suggest_digit_any)}</option>
             ${"0123456789".split("").map(d => `<option value="${d}">OK${d}</option>`).join("")}
           </select>
+          <label class="suggest-contest">
+            <input type="checkbox" id="suggestContest"> ${esc(T.suggest_contest_label)}
+          </label>
           <button type="submit">${esc(T.suggest_button)}</button>
         </form>
         <div class="suggest-hint">${esc(T.suggest_hint)}</div>
@@ -836,16 +843,34 @@
       </div>`;
 
       const suggestForm = document.getElementById("suggestForm");
+      const suggestPrefix = document.getElementById("suggestPrefix");
       const suggestInput = document.getElementById("suggestInput");
       const suggestDigit = document.getElementById("suggestDigit");
+      const suggestContest = document.getElementById("suggestContest");
       const suggestMeta = document.getElementById("suggestMeta");
       const suggestResult = document.getElementById("suggestResult");
+
+      // popisky číslic reflektují zvolený prefix (OK0.. / OL0..)
+      function refreshDigitLabels() {
+        const p = suggestPrefix.value;
+        [...suggestDigit.options].forEach(opt => {
+          if (opt.value) opt.textContent = p + opt.value;
+        });
+      }
+      suggestPrefix.addEventListener("change", refreshDigitLabels);
+      // v závodním režimu se text nezadává
+      suggestContest.addEventListener("change", () => {
+        suggestInput.disabled = suggestContest.checked;
+        if (suggestContest.checked) suggestInput.value = "";
+      });
 
       suggestInput.focus();
       suggestForm.addEventListener("submit", async e => {
         e.preventDefault();
         const text = suggestInput.value.trim();
-        if (!text) {
+        const prefix = suggestPrefix.value;
+        const contest = suggestContest.checked;
+        if (!contest && !text) {
           suggestMeta.textContent = "";
           suggestResult.innerHTML = `<div class="suggest-empty">${esc(T.suggest_empty)}</div>`;
           return;
@@ -854,7 +879,9 @@
         suggestMeta.textContent = "";
         suggestResult.textContent = T.suggest_loading;
         try {
-          const query = new URLSearchParams({ text });
+          const query = new URLSearchParams({ prefix });
+          if (contest) query.set("contest", "true");
+          else query.set("text", text);
           const selectedDigit = suggestDigit.value;
           if (selectedDigit) query.set("digit", selectedDigit);
           const r = await fetch("/api/suggest-callsign?" + query.toString());
