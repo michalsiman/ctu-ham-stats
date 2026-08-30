@@ -116,6 +116,26 @@ def test_contest_ok_excludes_digit_zero(conn):
     assert stats.suggest_contest_callsigns(conn, "OK", "0")["count"] == 0  # explicitní 0 → prázdno
 
 
+def test_suggestions_carry_freedom_status(conn):
+    # OK1B nikdy nebyla; OK1C propadla nedávno (ochrana běží); OK1D dávno (po lhůtě)
+    today = date.today()
+    recent = today.replace(year=today.year - 1).isoformat()
+    old = stats._add_years(today, -6).isoformat()
+    store_snapshot(conn, [
+        ("OK9ZZ", 1, "2035-01-01"),   # drží snapshot, je v latest
+        ("OK1C", 2, recent),          # v historii, nedávno → recently_lapsed
+        ("OK1D", 3, old),             # v historii, dávno → protection_elapsed
+    ], date(2026, 8, 1))
+    store_snapshot(conn, [("OK9ZZ", 1, "2035-01-01")], date(2026, 8, 2))  # OK1C/OK1D zmizely
+
+    r = stats.suggest_contest_callsigns(conn, "OK", "1", limit=1000)
+    by = {s["callsign"]: s for s in r["suggestions"]}
+    assert by["OK1B"]["freedom"] == stats.FREEDOM_NEVER
+    assert by["OK1C"]["freedom"] == stats.FREEDOM_LAPSED
+    assert by["OK1C"]["protection_ended"]  # datum konce ochrany je vyplněné
+    assert by["OK1D"]["freedom"] == stats.FREEDOM_ELAPSED
+
+
 def test_contest_ol_allows_digit_zero(conn):
     store_snapshot(conn, [("OK1A", 1, "2030-01-01")], date(2026, 8, 1))
     # OL0 + 1 písmeno je platné

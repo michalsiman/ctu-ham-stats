@@ -454,6 +454,16 @@
   }
   .cs-item small { display: block; color: var(--muted); font-family: inherit; font-size: .72rem; }
   .cs-item:hover { border-color: var(--lcd-dim); }
+  /* stavy volnosti navrhované značky */
+  .cs-item.freedom-never_used { border-left: 3px solid #4ccf6a; }
+  .cs-item.freedom-protection_elapsed { border-left: 3px solid #45b8b0; }
+  .cs-item.freedom-recently_lapsed { border-left: 3px solid #d0a24a; }
+  .freedom-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: baseline; }
+  .freedom-dot.freedom-never_used { background: #4ccf6a; }
+  .freedom-dot.freedom-protection_elapsed { background: #45b8b0; }
+  .freedom-dot.freedom-recently_lapsed { background: #d0a24a; }
+  .suggest-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; color: var(--muted); font-size: .76rem; }
+  .suggest-legend span { display: inline-flex; align-items: center; }
   .delta-wrap {
     display: flex;
     flex-direction: column;
@@ -914,10 +924,28 @@
             return;
           }
 
+          // stav volnosti: název i tooltip (u historických značek s datem konce ochrany)
+          const freedomLabel = f => ({
+            never_used: T.freedom_never,
+            protection_elapsed: T.freedom_elapsed,
+            recently_lapsed: T.freedom_lapsed,
+          }[f] || "");
+          const freedomTitle = x => {
+            const base = freedomLabel(x.freedom);
+            return x.protection_ended
+              ? `${base} · ${T.freedom_until.replace("{date}", x.protection_ended)}`
+              : base;
+          };
           suggestResult.innerHTML = `<div class="suggest-list">${d.suggestions.map(x =>
-            `<button type="button" class="cs-item" data-cs="${x.callsign}">
-               ${x.callsign}<small>${esc(T.suggest_suffix)} ${x.suffix}</small>
-             </button>`).join("")}</div>`;
+            `<button type="button" class="cs-item freedom-${x.freedom}" data-cs="${x.callsign}" title="${esc(freedomTitle(x))}">
+               <span class="freedom-dot freedom-${x.freedom}"></span>${x.callsign}<small>${esc(T.suggest_suffix)} ${x.suffix}</small>
+             </button>`).join("")}</div>
+            <div class="suggest-legend">
+              <span><span class="freedom-dot freedom-never_used"></span>${esc(T.freedom_never)}</span>
+              <span><span class="freedom-dot freedom-protection_elapsed"></span>${esc(T.freedom_elapsed)}</span>
+              <span><span class="freedom-dot freedom-recently_lapsed"></span>${esc(T.freedom_lapsed)}</span>
+            </div>
+            <div class="suggest-hint">${esc(T.freedom_caveat)}</div>`;
 
           suggestResult.querySelectorAll(".cs-item").forEach(el => el.addEventListener("click", () => {
             document.getElementById("searchInput").value = el.dataset.cs;

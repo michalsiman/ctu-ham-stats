@@ -450,14 +450,62 @@ def new_callsigns_list(conn: sqlite3.Connection, days: int, limit: int = 500) ->
     return [dict(r) for r in rows]
 
 
+# stavy volnosti navrhované značky (od „nejvolnější“ po „může se vrátit“)
+FREEDOM_NEVER = "never_used"          # v datech nikdy nebyla → jistě volná
+FREEDOM_ELAPSED = "protection_elapsed"  # poslední platnost + N let ≤ dnes → pravděpodobně volná
+FREEDOM_LAPSED = "recently_lapsed"    # ochranná lhůta ještě běží → původní držitel může obnovit
+
+
+def _annotate_freedom(
+    conn: sqlite3.Connection,
+    suggestions: list[dict],
+    protection_years: int = 5,
+) -> list[dict]:
+    """Ke každému návrhu doplní `freedom` (viz FREEDOM_*) podle historie v `licenses`.
+
+    U značek s historií přidá i `last_valid_until` a `protection_ended`. Stejná
+    výhrada jako u `freed_after_protection` – z open dat bez osobních údajů nejde
+    odlišit pozdní obnovu původním držitelem od nového přidělení, proto jde jen
+    o odhad, ne jistotu.
+    """
+    if not suggestions:
+        return suggestions
+    calls = [s["callsign"] for s in suggestions]
+    placeholders = ",".join("?" * len(calls))
+    history = {
+        row["callsign"]: row["last_valid"]
+        for row in conn.execute(
+            f"SELECT callsign, MAX(valid_until) AS last_valid FROM licenses "
+            f"WHERE callsign IN ({placeholders}) GROUP BY callsign",
+            calls,
+        ).fetchall()
+    }
+    today = date.today()
+    for s in suggestions:
+        last_valid = history.get(s["callsign"])
+        if last_valid is None:
+            s["freedom"] = FREEDOM_NEVER
+        else:
+            free_date = _add_years(date.fromisoformat(last_valid), protection_years)
+            s["last_valid_until"] = last_valid
+            s["protection_ended"] = free_date.isoformat()
+            s["freedom"] = FREEDOM_ELAPSED if free_date <= today else FREEDOM_LAPSED
+    return suggestions
+
+
 def suggest_callsigns(
     conn: sqlite3.Connection,
     text: str,
     limit: int = 48,
     digit: str | None = None,
     prefix: str = "OK",
+    protection_years: int = 5,
 ) -> dict:
-    """Navrhne volné značky {prefix}{digit}{suffix} podle zadaného textu."""
+    """Navrhne volné značky {prefix}{digit}{suffix} podle zadaného textu.
+
+    Každý návrh nese `freedom` (viz FREEDOM_*) pro rozlišení skutečně volných
+    značek od těch, u nichž ještě běží ochranná lhůta.
+    """
     if prefix not in ("OK", "OL"):
         raise ValueError("prefix musí být OK nebo OL")
 
@@ -514,6 +562,18 @@ def suggest_callsigns(
             available_by_suffix.append((suffix, digits))
 
     suggestions: list[dict] = []
+
+    def _finish() -> dict:
+        _annotate_freedom(conn, suggestions, protection_years)
+        return {
+            "input": text,
+            "normalized": normalized,
+            "digit_filter": digit,
+            "prefix": prefix,
+            "count": len(suggestions),
+            "suggestions": suggestions,
+        }
+
     round_index = 0
     while len(suggestions) < limit:
         progressed = False
@@ -530,26 +590,12 @@ def suggest_callsigns(
             )
             progressed = True
             if len(suggestions) >= limit:
-                return {
-                    "input": text,
-                    "normalized": normalized,
-                    "digit_filter": digit,
-                    "prefix": prefix,
-                    "count": len(suggestions),
-                    "suggestions": suggestions,
-                }
+                return _finish()
         if not progressed:
             break
         round_index += 1
 
-    return {
-        "input": text,
-        "normalized": normalized,
-        "digit_filter": digit,
-        "prefix": prefix,
-        "count": len(suggestions),
-        "suggestions": suggestions,
-    }
+    return _finish()
 
 
 def suggest_contest_callsigns(
@@ -557,6 +603,7 @@ def suggest_contest_callsigns(
     prefix: str = "OK",
     digit: str | None = None,
     limit: int = 260,
+    protection_years: int = 5,
 ) -> dict:
     """Vypíše volné závodní značky tvaru {prefix}{číslice}{1 písmeno}.
 
@@ -594,6 +641,12 @@ def suggest_contest_callsigns(
     letters = [chr(c) for c in range(ord("A"), ord("Z") + 1)]
 
     suggestions: list[dict] = []
+
+    def _finish() -> dict:
+        _annotate_freedom(conn, suggestions, protection_years)
+        return {"prefix": prefix, "digit_filter": digit, "contest": True,
+                "count": len(suggestions), "suggestions": suggestions}
+
     for d in digits:
         for letter in letters:
             callsign = f"{prefix}{d}{letter}"
@@ -601,11 +654,9 @@ def suggest_contest_callsigns(
                 continue
             suggestions.append({"callsign": callsign, "digit": d, "suffix": letter})
             if len(suggestions) >= limit:
-                return {"prefix": prefix, "digit_filter": digit, "contest": True,
-                        "count": len(suggestions), "suggestions": suggestions}
+                return _finish()
 
-    return {"prefix": prefix, "digit_filter": digit, "contest": True,
-            "count": len(suggestions), "suggestions": suggestions}
+    return _finish()
 
 
 def freed_after_protection(
