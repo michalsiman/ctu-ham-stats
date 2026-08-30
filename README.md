@@ -18,12 +18,16 @@ Aplikace se poprvé objevila v roce 2024 na mé staré doméně vlastni.cloud, k
 - ukládá snapshoty do SQLite a **diffuje je** – CSV neobsahuje datum vydání, takže přírůstky a úbytky lze zjistit jen porovnáváním snapshotů v čase
 - dashboard: aktuální počet unikátních volacích značek, denní a měsíční přírůstky/úbytky unikátních značek, počet značek expirujících do 7/30/90 dnů, graf vývoje
 - dashboard navíc obsahuje blok „nové značky za 30 dní“ (dle `first_seen` v tabulce `callsigns`, tedy skutečně nově vzniklé unikátní značky, ne pouhé prodloužení)
-- dashboard navíc obsahuje blok „Navrhnout novou značku“, který z textu skládá kandidáty ve tvaru `OK` + 1 číslice + 1 až 3 písmena a vybírá volné návrhy z aktuálních dat
+- dashboard navíc obsahuje blok „Navrhnout novou značku“, který z textu skládá kandidáty ve tvaru `OK` + 1 číslice + 1 až 3 písmena a vybírá volné návrhy z aktuálních dat; přepínačem lze zvolit prefix `OK`/`OL` a **závodní režim**, který vypíše volné short cally `OK`/`OL` + 1 číslice + 1 písmeno (např. `OK1A`)
 - jednoduché počítadlo návštěv hlavní stránky: denní unikáty, přehled podle země, souhrn za 7 dní a 365 dní na `/visits`
 - JSON API: `/api/summary`, `/api/daily`, `/api/expiring?days=30`, `/api/stations?kind=club`, `/api/callsign/OK1SIM`, `/api/breakdown`
 - JSON API nových značek: `/api/new-callsigns?days=30`
-- JSON API návrhů značek: `/api/suggest-callsign?text=Novak`
+- JSON API návrhů značek: `/api/suggest-callsign?text=Novak` (parametry `prefix=OK|OL`, `contest=true` pro závodní short cally)
+- JSON API kandidátů na uvolnění po ochranné lhůtě: `/api/free-after-protection?years=5` – **pravděpodobně volné, ne jistota** (viz níže)
 - JSON API návštěvnosti: `/api/visits/today`, `/api/visits/range?days=7`
+- **MCP server** na `/mcp` (streamable HTTP, read-only) – AI agent se připojí a dotazuje přes nástroje `overview`, `recent_changes`, `daily_trend`, `suggest_callsign`, `expiring_soon`, `free_after_protection`, `callsign_lookup`
+
+Kandidáti na uvolnění (`/api/free-after-protection`, MCP `free_after_protection`) se vrací vždy s `confidence: "candidate"`: z otevřených dat ČTÚ (bez osobních údajů) nelze odlišit pozdní obnovu původním držitelem od nového přidělení, proto „pravděpodobně volné“, ne „volné“.
 
 Vyhledávání značky má validaci formátu (frontend + backend): musí začínat `OK` nebo `OL`, následovat minimálně jedna číslice a pak volitelně písmena/číslice (`^(OK|OL)\d+[0-9A-Z]*$`). Neplatný vstup se neodesílá na API.
 - vícejazyčné rozhraní: čeština, angličtina, němčina, francouzština (přepínač vpravo nahoře)
@@ -47,6 +51,23 @@ curl -X POST http://localhost:8000/api/ingest   # první naplnění dat
 
 Kontejner pak sám stahuje data v 6:00 a ve 14:00 (nastavitelné přes `INGEST_TIMES`, klidně i víc časů). Data (SQLite + archiv CSV) jsou v bind-mountovaném adresáři `./data`.
 
+## Import historických dat (backfill)
+
+Historii nelze zpětně dohnat ze živého zdroje (CSV nemá datum vydání), ale starší
+ručně stažené exporty se dají doplnit jednorázově. Oddělovač (`;` u starších, `,` u
+novějších exportů) se autodetekuje. Spouštět **chronologicky od nejstaršího** a vždy
+tak, aby datum bylo starší než libovolný už uložený snapshot (jinak se rozbijí
+`added/removed` u okolních dat – skript na to upozorní a vyžádá potvrzení):
+
+```bash
+python -m app.backfill data/backfill/opravneni_2022-12-15.csv 2022-12-15
+python -m app.backfill data/backfill/opravneni_2025-06-06.csv 2025-06-06
+```
+
+Den s velkou mezerou k předchozímu snapshotu (backfill / první reálný ingest po něm)
+má v `/api/daily` `added/removed = null` a `reconstructed: true`, aby jednorázový
+přeskok nezkreslil denní přírůstkovou křivku.
+
 ## Konfigurace
 
 | Proměnná | Výchozí | Popis |
@@ -63,6 +84,7 @@ Počítadlo má jednoduchý filtr botů podle `User-Agent` (crawler/spider/bot/m
 ## Testy
 
 ```bash
+pip install -r requirements-dev.txt   # runtime závislosti + pytest
 python -m pytest tests/
 ```
 
