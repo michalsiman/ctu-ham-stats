@@ -33,14 +33,17 @@ def backfill(csv_path: Path, snapshot_date: date, assume_yes: bool = False) -> d
 
     conn = db.connect()
     try:
-        earliest = stats.earliest_snapshot(conn)
+        latest = stats.latest_snapshot(conn)
         snap = snapshot_date.isoformat()
-        if earliest is not None and snap >= earliest:
+        if latest is not None and snap < latest:
             log.warning(
-                "Snapshot %s NENÍ starší než nejstarší uložený snapshot %s. "
-                "Backfill „doprostřed“ historie rozbije added/removed u okolních dat "
-                "(tabulky licenses/callsigns se plní idempotentně, ta zůstanou v pořádku).",
-                snap, earliest,
+                "Snapshot %s je starší než nejnovější uložený snapshot %s. "
+                "Backfill „doprostřed/před“ existující historii nechá added/removed u "
+                "novějších snapshotů neaktuální a first_seen v tabulce callsigns "
+                "nesprávné (licenses se plní idempotentně, ta zůstane v pořádku). "
+                "Backfill spouštějte chronologicky od nejstaršího a před prvním "
+                "reálným ingestem.",
+                snap, latest,
             )
             if not assume_yes and not _confirm():
                 raise SystemExit("Přerušeno uživatelem.")

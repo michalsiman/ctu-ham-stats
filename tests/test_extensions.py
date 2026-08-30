@@ -39,34 +39,35 @@ def test_parse_rows_autodetects_delimiter():
 
 # --- 0. backfill ---
 
-def test_backfill_refuses_insert_into_middle(tmp_path, monkeypatch):
+def test_backfill_refuses_date_before_latest(tmp_path, monkeypatch):
     dbp = tmp_path / "bf.db"
     monkeypatch.setattr(config, "DB_PATH", dbp)
     seed = db.connect(dbp)
-    store_snapshot(seed, [("OK1AAA", 1, "2030-01-01")], date(2026, 1, 1))
+    store_snapshot(seed, [("OK1AAA", 1, "2030-01-01")], date(2026, 8, 30))
     seed.close()
 
     hist = tmp_path / "hist.csv"
     hist.write_text(_SEMI, encoding="utf-8")
 
-    # datum >= nejstarší uložený snapshot (2026-01-01) → v neinteraktivním
-    # režimu bez --yes se potvrzení nezíská a backfill se přeruší
+    # datum starší než nejnovější uložený snapshot (2026-08-30) → „doprostřed“
+    # historie; v neinteraktivním režimu bez --yes se potvrzení nezíská a přeruší se
     with pytest.raises(SystemExit):
-        backfill.backfill(hist, date(2026, 6, 1))
+        backfill.backfill(hist, date(2025, 6, 6))
 
 
-def test_backfill_accepts_older_date(tmp_path, monkeypatch):
+def test_backfill_appends_newer_without_warning(tmp_path, monkeypatch):
     dbp = tmp_path / "bf.db"
     monkeypatch.setattr(config, "DB_PATH", dbp)
     seed = db.connect(dbp)
-    store_snapshot(seed, [("OK1AAA", 1, "2030-01-01")], date(2026, 1, 1))
+    store_snapshot(seed, [("OK1AAA", 1, "2030-01-01")], date(2022, 12, 15))
     seed.close()
 
     hist = tmp_path / "hist.csv"
     hist.write_text(_SEMI, encoding="utf-8")
 
-    result = backfill.backfill(hist, date(2025, 1, 1))  # starší než earliest → bez varování
-    assert result["snapshot_date"] == "2025-01-01"
+    # novější než latest → normální chronologický krok, bez varování
+    result = backfill.backfill(hist, date(2025, 6, 6))
+    assert result["snapshot_date"] == "2025-06-06"
     assert result["unique_callsigns"] == 2
 
 
