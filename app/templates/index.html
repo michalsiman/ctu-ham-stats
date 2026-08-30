@@ -387,6 +387,9 @@
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     gap: 6px;
     width: 100%;
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 4px;
   }
   .suggest-list .cs-item {
     width: 100%;
@@ -838,16 +841,15 @@
           <input id="suggestInput" placeholder="${esc(T.suggest_placeholder)}"
                  maxlength="80" autocomplete="off" spellcheck="false"
                  aria-label="${esc(T.suggest_label)}">
+          <select id="suggestMode" aria-label="${esc(T.suggest_mode_label)}">
+            <option value="name">${esc(T.suggest_mode_name)}</option>
+            <option value="suffix">${esc(T.suggest_mode_suffix)}</option>
+            <option value="contest">${esc(T.suggest_mode_contest)}</option>
+          </select>
           <select id="suggestDigit" aria-label="${esc(T.suggest_digit_label)}">
             <option value="">${esc(T.suggest_digit_any)}</option>
             ${"0123456789".split("").map(d => `<option value="${d}">OK${d}</option>`).join("")}
           </select>
-          <label class="suggest-contest">
-            <input type="checkbox" id="suggestContains"> ${esc(T.suggest_contains_label)}
-          </label>
-          <label class="suggest-contest">
-            <input type="checkbox" id="suggestContest"> ${esc(T.suggest_contest_label)}
-          </label>
           <button type="submit">${esc(T.suggest_button)}</button>
         </form>
         <div class="suggest-hint">${esc(T.suggest_hint)}</div>
@@ -858,9 +860,8 @@
       const suggestForm = document.getElementById("suggestForm");
       const suggestPrefix = document.getElementById("suggestPrefix");
       const suggestInput = document.getElementById("suggestInput");
+      const suggestMode = document.getElementById("suggestMode");
       const suggestDigit = document.getElementById("suggestDigit");
-      const suggestContest = document.getElementById("suggestContest");
-      const suggestContains = document.getElementById("suggestContains");
       const suggestMeta = document.getElementById("suggestMeta");
       const suggestResult = document.getElementById("suggestResult");
 
@@ -876,34 +877,29 @@
       // v závodním režimu zakázat 0 jen u prefixu OK
       function refreshZeroOption() {
         if (!zeroOption) return;
-        const disable = suggestContest.checked && suggestPrefix.value === "OK";
+        const disable = suggestMode.value === "contest" && suggestPrefix.value === "OK";
         zeroOption.disabled = disable;
         if (disable && suggestDigit.value === "0") suggestDigit.value = "";
       }
+      // v závodním režimu se text nezadává (skládá se z číslic × písmen)
+      function refreshMode() {
+        const contest = suggestMode.value === "contest";
+        suggestInput.disabled = contest;
+        if (contest) suggestInput.value = "";
+        suggestInput.placeholder = suggestMode.value === "suffix"
+          ? T.suggest_placeholder_suffix : T.suggest_placeholder;
+        refreshZeroOption();
+      }
       suggestPrefix.addEventListener("change", () => { refreshDigitLabels(); refreshZeroOption(); });
-      // závodní a „v příponě“ se vylučují; v závodním režimu se text nezadává
-      suggestContest.addEventListener("change", () => {
-        if (suggestContest.checked) suggestContains.checked = false;
-        suggestInput.disabled = suggestContest.checked;
-        if (suggestContest.checked) suggestInput.value = "";
-        refreshZeroOption();
-      });
-      suggestContains.addEventListener("change", () => {
-        if (suggestContains.checked) {
-          suggestContest.checked = false;
-          suggestInput.disabled = false;
-        }
-        refreshZeroOption();
-      });
+      suggestMode.addEventListener("change", refreshMode);
 
       suggestInput.focus();
       suggestForm.addEventListener("submit", async e => {
         e.preventDefault();
         const text = suggestInput.value.trim();
         const prefix = suggestPrefix.value;
-        const contest = suggestContest.checked;
-        const contains = suggestContains.checked;
-        if (!contest && !text) {
+        const mode = suggestMode.value;
+        if (mode !== "contest" && !text) {
           suggestMeta.textContent = "";
           suggestResult.innerHTML = `<div class="suggest-empty">${esc(T.suggest_empty)}</div>`;
           return;
@@ -912,12 +908,12 @@
         suggestMeta.textContent = "";
         suggestResult.textContent = T.suggest_loading;
         try {
-          const query = new URLSearchParams({ prefix });
-          if (contest) {
+          const query = new URLSearchParams({ prefix, limit: "150" });
+          if (mode === "contest") {
             query.set("contest", "true");
           } else {
             query.set("text", text);
-            if (contains) query.set("contains", "true");
+            if (mode === "suffix") query.set("contains", "true");
           }
           const selectedDigit = suggestDigit.value;
           if (selectedDigit) query.set("digit", selectedDigit);
