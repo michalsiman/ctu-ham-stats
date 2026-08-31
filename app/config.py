@@ -65,6 +65,18 @@ MASK_CALLSIGN_REPLACEMENT = os.getenv(
     "MASK_CALLSIGN_REPLACEMENT", _ini_get("callsign_mask", "replacement", "neznámá")
 )
 
+# Povolené hodnoty hlavičky Host pro MCP endpoint (/mcp) – ochrana proti
+# DNS-rebindingu. Za reverzní proxy uveď veřejné hostname webu. localhost se
+# povolí vždy. Prázdná hodnota = ochranu vypnout (řeší proxy).
+MCP_ALLOWED_HOSTS = os.getenv(
+    "MCP_ALLOWED_HOSTS", _ini_get("mcp", "allowed_hosts", "")
+)
+
+
+def mcp_allowed_hosts() -> list[str]:
+    """Naparsuje MCP_ALLOWED_HOSTS na seznam hostname (bez prázdných položek)."""
+    return [h.strip() for h in MCP_ALLOWED_HOSTS.split(",") if h.strip()]
+
 
 def ingest_times() -> list[tuple[int, int]]:
     """Naparsuje INGEST_TIMES na seznam (hodina, minuta)."""
