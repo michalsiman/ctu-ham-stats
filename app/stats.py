@@ -1,8 +1,22 @@
 """Dotazy nad uloženými snapshoty."""
+import re
 import sqlite3
 import unicodedata
 from datetime import date, timedelta
-from itertools import combinations
+from itertools import combinations, product
+
+# Standardní OK/OL značka: jedna číslice a 1–4 písmen v příponě.
+# Příležitostné/eventové značky mívají víc číslic nebo delší/číselnou příponu
+# (např. OL70OU, OL15SOTA, OL22YOTA) – ty se defaultně vylučují.
+_STANDARD_CALLSIGN_RE = re.compile(r"^(OK|OL)\d[A-Z]{1,4}$")
+
+
+def _add_years(d: date, years: int) -> date:
+    """Přičte roky s ošetřením 29. února (v nepřestupném roce → 28. 2.)."""
+    try:
+        return d.replace(year=d.year + years)
+    except ValueError:
+        return d.replace(month=2, day=28, year=d.year + years)
 
 
 def latest_snapshot(conn: sqlite3.Connection) -> str | None:
@@ -436,19 +450,72 @@ def new_callsigns_list(conn: sqlite3.Connection, days: int, limit: int = 500) ->
     return [dict(r) for r in rows]
 
 
+# stavy volnosti navrhované značky (od „nejvolnější“ po „může se vrátit“)
+FREEDOM_NEVER = "never_used"          # v datech nikdy nebyla → jistě volná
+FREEDOM_ELAPSED = "protection_elapsed"  # poslední platnost + N let ≤ dnes → pravděpodobně volná
+FREEDOM_LAPSED = "recently_lapsed"    # ochranná lhůta ještě běží → původní držitel může obnovit
+
+
+def _annotate_freedom(
+    conn: sqlite3.Connection,
+    suggestions: list[dict],
+    protection_years: int = 5,
+) -> list[dict]:
+    """Ke každému návrhu doplní `freedom` (viz FREEDOM_*) podle historie v `licenses`.
+
+    U značek s historií přidá i `last_valid_until` a `protection_ended`. Stejná
+    výhrada jako u `freed_after_protection` – z open dat bez osobních údajů nejde
+    odlišit pozdní obnovu původním držitelem od nového přidělení, proto jde jen
+    o odhad, ne jistotu.
+    """
+    if not suggestions:
+        return suggestions
+    calls = [s["callsign"] for s in suggestions]
+    placeholders = ",".join("?" * len(calls))
+    history = {
+        row["callsign"]: row["last_valid"]
+        for row in conn.execute(
+            f"SELECT callsign, MAX(valid_until) AS last_valid FROM licenses "
+            f"WHERE callsign IN ({placeholders}) GROUP BY callsign",
+            calls,
+        ).fetchall()
+    }
+    today = date.today()
+    for s in suggestions:
+        last_valid = history.get(s["callsign"])
+        if last_valid is None:
+            s["freedom"] = FREEDOM_NEVER
+        else:
+            free_date = _add_years(date.fromisoformat(last_valid), protection_years)
+            s["last_valid_until"] = last_valid
+            s["protection_ended"] = free_date.isoformat()
+            s["freedom"] = FREEDOM_ELAPSED if free_date <= today else FREEDOM_LAPSED
+    return suggestions
+
+
 def suggest_callsigns(
     conn: sqlite3.Connection,
     text: str,
     limit: int = 48,
     digit: str | None = None,
+    prefix: str = "OK",
+    protection_years: int = 5,
 ) -> dict:
-    """Navrhne volné značky OK{digit}{suffix} podle zadaného textu."""
+    """Navrhne volné značky {prefix}{digit}{suffix} podle zadaného textu.
+
+    Každý návrh nese `freedom` (viz FREEDOM_*) pro rozlišení skutečně volných
+    značek od těch, u nichž ještě běží ochranná lhůta.
+    """
+    if prefix not in ("OK", "OL"):
+        raise ValueError("prefix musí být OK nebo OL")
+
     latest = latest_snapshot(conn)
     if not latest:
         return {
             "input": text,
             "normalized": "",
             "digit_filter": digit,
+            "prefix": prefix,
             "count": 0,
             "suggestions": [],
         }
@@ -459,6 +526,7 @@ def suggest_callsigns(
             "input": text,
             "normalized": "",
             "digit_filter": digit,
+            "prefix": prefix,
             "count": 0,
             "suggestions": [],
         }
@@ -468,6 +536,7 @@ def suggest_callsigns(
             "input": text,
             "normalized": normalized,
             "digit_filter": digit,
+            "prefix": prefix,
             "count": 0,
             "suggestions": [],
         }
@@ -488,11 +557,23 @@ def suggest_callsigns(
     available_by_suffix: list[tuple[str, list[str]]] = []
     for suffix in ordered_suffixes:
         digits_pool = [digit] if digit else list("1234567890")
-        digits = [d for d in digits_pool if f"OK{d}{suffix}" not in current_callsigns]
+        digits = [d for d in digits_pool if f"{prefix}{d}{suffix}" not in current_callsigns]
         if digits:
             available_by_suffix.append((suffix, digits))
 
     suggestions: list[dict] = []
+
+    def _finish() -> dict:
+        _annotate_freedom(conn, suggestions, protection_years)
+        return {
+            "input": text,
+            "normalized": normalized,
+            "digit_filter": digit,
+            "prefix": prefix,
+            "count": len(suggestions),
+            "suggestions": suggestions,
+        }
+
     round_index = 0
     while len(suggestions) < limit:
         progressed = False
@@ -502,31 +583,205 @@ def suggest_callsigns(
             digit = digits[round_index]
             suggestions.append(
                 {
-                    "callsign": f"OK{digit}{suffix}",
+                    "callsign": f"{prefix}{digit}{suffix}",
                     "digit": digit,
                     "suffix": suffix,
                 }
             )
             progressed = True
             if len(suggestions) >= limit:
-                return {
-                    "input": text,
-                    "normalized": normalized,
-                    "digit_filter": digit,
-                    "count": len(suggestions),
-                    "suggestions": suggestions,
-                }
+                return _finish()
         if not progressed:
             break
         round_index += 1
 
-    return {
-        "input": text,
-        "normalized": normalized,
-        "digit_filter": digit,
-        "count": len(suggestions),
-        "suggestions": suggestions,
+    return _finish()
+
+
+def suggest_contest_callsigns(
+    conn: sqlite3.Connection,
+    prefix: str = "OK",
+    digit: str | None = None,
+    limit: int = 260,
+    protection_years: int = 5,
+) -> dict:
+    """Vypíše volné závodní značky tvaru {prefix}{číslice}{1 písmeno}.
+
+    Na rozdíl od `suggest_callsigns` se neodvozuje z textu, ale enumeruje
+    kombinace `PREFIX + číslice + 1 písmeno` a vrací jen ty, které nejsou v
+    posledním snapshotu (tedy pravděpodobně volné short cally pro závody).
+
+    U prefixu `OK` je číslice 0 vyhrazená pro klubové/speciální stanice, takže
+    `OK0` + 1 písmeno neexistuje a vylučuje se; u `OL` je `OL0` + 1 písmeno
+    platné, proto se 0 povoluje.
+    """
+    if prefix not in ("OK", "OL"):
+        raise ValueError("prefix musí být OK nebo OL")
+
+    latest = latest_snapshot(conn)
+    if not latest:
+        return {"prefix": prefix, "digit_filter": digit, "contest": True,
+                "count": 0, "suggestions": []}
+
+    if digit is not None and (len(digit) != 1 or digit not in "0123456789"):
+        return {"prefix": prefix, "digit_filter": digit, "contest": True,
+                "count": 0, "suggestions": []}
+
+    current_callsigns = {
+        row["callsign"]
+        for row in conn.execute(
+            "SELECT callsign FROM callsigns WHERE last_seen = ?",
+            (latest,),
+        ).fetchall()
     }
+
+    # u OK je 0 pro klubové/speciální stanice (OK0+1 písmeno neexistuje), u OL je platná
+    all_digits = list("0123456789") if prefix == "OL" else list("123456789")
+    digits = [d for d in ([digit] if digit else all_digits) if d in all_digits]
+    letters = [chr(c) for c in range(ord("A"), ord("Z") + 1)]
+
+    suggestions: list[dict] = []
+
+    def _finish() -> dict:
+        _annotate_freedom(conn, suggestions, protection_years)
+        return {"prefix": prefix, "digit_filter": digit, "contest": True,
+                "count": len(suggestions), "suggestions": suggestions}
+
+    for d in digits:
+        for letter in letters:
+            callsign = f"{prefix}{d}{letter}"
+            if callsign in current_callsigns:
+                continue
+            suggestions.append({"callsign": callsign, "digit": d, "suffix": letter})
+            if len(suggestions) >= limit:
+                return _finish()
+
+    return _finish()
+
+
+_A_TO_Z = [chr(c) for c in range(ord("A"), ord("Z") + 1)]
+_SUFFIX_DIGIT_ORDER = "1234567890"  # 1–9 pak 0 (0 bývá klubové/speciální)
+
+
+def _suffixes_containing(fragment: str, max_len: int = 3) -> list[str]:
+    """Všechny přípony délky ≤ max_len obsahující `fragment` jako souvislý úsek.
+
+    Např. 'AA' → ['AA', 'AAA', 'AAB', …, 'BAA', …] (přesně, začíná i končí).
+    """
+    n = len(fragment)
+    if n == 0 or n > max_len:
+        return []
+    out: set[str] = {fragment}
+    for total in range(n + 1, max_len + 1):
+        extra = total - n
+        for before in range(extra + 1):
+            after = extra - before
+            for pre in product(_A_TO_Z, repeat=before):
+                for suf in product(_A_TO_Z, repeat=after):
+                    out.add("".join(pre) + fragment + "".join(suf))
+    return sorted(out, key=lambda s: (len(s), s))
+
+
+def suggest_by_suffix_contains(
+    conn: sqlite3.Connection,
+    text: str,
+    prefix: str = "OK",
+    digit: str | None = None,
+    limit: int = 48,
+    protection_years: int = 5,
+) -> dict:
+    """Volné značky, jejichž přípona (do 3 písmen) OBSAHUJE zadaný text.
+
+    Text se bere jako souvislý úsek přípony, takže se najdou značky, které jím
+    začínají i končí (např. 'AA' → OK1AA, OK1AAB, OK1BAA). Každý návrh nese
+    `freedom` stejně jako ostatní návrhy.
+    """
+    if prefix not in ("OK", "OL"):
+        raise ValueError("prefix musí být OK nebo OL")
+
+    normalized = normalize_suggestion_seed(text)
+    latest = latest_snapshot(conn)
+    invalid_digit = digit is not None and (len(digit) != 1 or digit not in "0123456789")
+    if not latest or not normalized or len(normalized) > 3 or invalid_digit:
+        return {"input": text, "normalized": normalized, "fragment": normalized,
+                "prefix": prefix, "digit_filter": digit, "mode": "suffix_contains",
+                "count": 0, "suggestions": []}
+
+    current_callsigns = {
+        row["callsign"]
+        for row in conn.execute(
+            "SELECT callsign FROM callsigns WHERE last_seen = ?",
+            (latest,),
+        ).fetchall()
+    }
+
+    candidate_suffixes = _suffixes_containing(normalized, 3)
+    digits = [digit] if digit else list(_SUFFIX_DIGIT_ORDER)
+
+    suggestions: list[dict] = []
+    for suffix in candidate_suffixes:
+        for d in digits:
+            callsign = f"{prefix}{d}{suffix}"
+            if callsign in current_callsigns:
+                continue
+            suggestions.append({"callsign": callsign, "digit": d, "suffix": suffix})
+
+    # kratší přípony první, pak číslice v pořadí 1–9,0, pak abecedně
+    suggestions.sort(key=lambda s: (len(s["suffix"]), _SUFFIX_DIGIT_ORDER.index(s["digit"]), s["suffix"]))
+    suggestions = suggestions[:limit]
+    _annotate_freedom(conn, suggestions, protection_years)
+
+    return {"input": text, "normalized": normalized, "fragment": normalized,
+            "prefix": prefix, "digit_filter": digit, "mode": "suffix_contains",
+            "count": len(suggestions), "suggestions": suggestions}
+
+
+def freed_after_protection(
+    conn: sqlite3.Connection,
+    protection_years: int = 5,
+    include_occasional: bool = False,
+) -> list[dict]:
+    """Značky nepřítomné v posledním snapshotu, kde od posledního známého
+    'Platnost do' uplynulo aspoň `protection_years` let.
+
+    DŮLEŽITÁ VÝHRADA – vracet vždy s polem `confidence: "candidate"`, nikdy
+    netvrdit jistotu. ČTÚ open data neobsahují osobní údaje, nelze odlišit
+    pozdní obnovu původním držitelem od přidělení novému zájemci (pozorovali
+    jsme značky, které zmizely na 1–3 roky a pak se vrátily s novou referencí).
+    """
+    latest = latest_snapshot(conn)
+    if not latest:
+        return []
+
+    rows = conn.execute(
+        """
+        SELECT callsign, MAX(valid_until) AS last_valid
+        FROM licenses
+        WHERE callsign NOT IN (
+            SELECT callsign FROM callsigns WHERE last_seen = ?
+        )
+        GROUP BY callsign
+        """,
+        (latest,),
+    ).fetchall()
+
+    today = date.today()
+    out: list[dict] = []
+    for row in rows:
+        callsign = row["callsign"]
+        if not include_occasional and not _STANDARD_CALLSIGN_RE.match(callsign):
+            continue
+        last_valid = date.fromisoformat(row["last_valid"])
+        free_date = _add_years(last_valid, protection_years)
+        if free_date <= today:
+            out.append({
+                "callsign": callsign,
+                "last_valid_until": last_valid.isoformat(),
+                "protection_ended": free_date.isoformat(),
+                "confidence": "candidate",
+            })
+    out.sort(key=lambda r: r["protection_ended"])
+    return out
 
 
 def expiring_count(conn: sqlite3.Connection, days: int) -> int | None:
@@ -602,8 +857,20 @@ def expiring_list(conn: sqlite3.Connection, days: int, limit: int = 500) -> list
     return [dict(r) for r in rows]
 
 
+# Mezera mezi po sobě jdoucími snapshoty větší než tento počet dní znamená, že
+# added/removed pokrývá dlouhé období (backfill starších importů nebo první reálný
+# ingest po nich) – taková „denní“ delta by křivku zkreslila, proto se do grafu
+# nekreslí a bod se označí jako reconstructed.
+_RECONSTRUCTED_GAP_DAYS = 2
+
+
 def daily_series(conn: sqlite3.Connection, limit: int = 365) -> list[dict]:
-    """Časová řada denních statistik pro graf (vzestupně)."""
+    """Časová řada denních statistik pro graf (vzestupně).
+
+    U bodů s velkou mezerou k předchozímu snapshotu se added/removed vynuluje
+    (viz `_RECONSTRUCTED_GAP_DAYS`), aby jednorázový přeskok z backfillu
+    nezkreslil denní přírůstkovou křivku. Počty unikátních značek zůstávají.
+    """
     rows = conn.execute(
         """
         SELECT snapshot_date, unique_callsigns, added, removed
@@ -613,7 +880,21 @@ def daily_series(conn: sqlite3.Connection, limit: int = 365) -> list[dict]:
         """,
         (limit,),
     ).fetchall()
-    return [dict(r) for r in reversed(rows)]
+
+    series = [dict(r) for r in reversed(rows)]
+    prev_date: date | None = None
+    for point in series:
+        current = date.fromisoformat(point["snapshot_date"])
+        reconstructed = (
+            prev_date is not None
+            and (current - prev_date).days > _RECONSTRUCTED_GAP_DAYS
+        )
+        point["reconstructed"] = reconstructed
+        if reconstructed:
+            point["added"] = None
+            point["removed"] = None
+        prev_date = current
+    return series
 
 
 def callsign_lookup(conn: sqlite3.Connection, callsign: str) -> dict:

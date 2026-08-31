@@ -387,7 +387,19 @@
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     gap: 6px;
     width: 100%;
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 4px;
+    scrollbar-width: thin;                       /* Firefox */
+    scrollbar-color: var(--panel-edge) transparent;
   }
+  .suggest-list::-webkit-scrollbar { width: 8px; }
+  .suggest-list::-webkit-scrollbar-track { background: transparent; }
+  .suggest-list::-webkit-scrollbar-thumb {
+    background: var(--panel-edge);
+    border-radius: 4px;
+  }
+  .suggest-list::-webkit-scrollbar-thumb:hover { background: var(--lcd-dim); }
   .suggest-list .cs-item {
     width: 100%;
   }
@@ -454,6 +466,16 @@
   }
   .cs-item small { display: block; color: var(--muted); font-family: inherit; font-size: .72rem; }
   .cs-item:hover { border-color: var(--lcd-dim); }
+  /* stavy volnosti navrhované značky */
+  .cs-item.freedom-never_used { border-left: 3px solid #4ccf6a; }
+  .cs-item.freedom-protection_elapsed { border-left: 3px solid #45b8b0; }
+  .cs-item.freedom-recently_lapsed { border-left: 3px solid #d0a24a; }
+  .freedom-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: baseline; }
+  .freedom-dot.freedom-never_used { background: #4ccf6a; }
+  .freedom-dot.freedom-protection_elapsed { background: #45b8b0; }
+  .freedom-dot.freedom-recently_lapsed { background: #d0a24a; }
+  .suggest-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; color: var(--muted); font-size: .76rem; }
+  .suggest-legend span { display: inline-flex; align-items: center; }
   .delta-wrap {
     display: flex;
     flex-direction: column;
@@ -776,11 +798,12 @@
   <footer>
     {{ t.footer_snapshot }} {{ summary.snapshot_date }} ·
     <a href="/api/summary">API</a> ·
+    {{ t.footer_mcp }} ·
     <a href="/api/expiring?days=30">{{ t.footer_expiring }}</a> ·
     <a href="/visits{% if lang %}?lang={{ lang }}{% endif %}">{{ t.footer_visits }}</a> ·
     {{ t.footer_data }} <a href="https://data.ctu.gov.cz/dataset/individualni-opravneni-volaci-znacky-stanic-amaterske-sluzby">data.ctu.gov.cz</a> ·
     open source · <a href="https://github.com/michalsiman/ctu-ham-stats" target="_blank" rel="noopener">GitHub</a> ·
-    Autor: Michal Šiman OK1SIM
+    Autoři: Michal Šiman OK1SIM, Ondřej Koloničný OK1CDJ
   </footer>
 
   <script>
@@ -821,9 +844,18 @@
       title.textContent = T.panel_suggest;
       grid.innerHTML = `<div class="suggest-wrap">
         <form class="suggest-form" id="suggestForm">
+          <select id="suggestPrefix" aria-label="${esc(T.suggest_prefix_label)}">
+            <option value="OK">OK</option>
+            <option value="OL">OL</option>
+          </select>
           <input id="suggestInput" placeholder="${esc(T.suggest_placeholder)}"
                  maxlength="80" autocomplete="off" spellcheck="false"
                  aria-label="${esc(T.suggest_label)}">
+          <select id="suggestMode" aria-label="${esc(T.suggest_mode_label)}">
+            <option value="name">${esc(T.suggest_mode_name)}</option>
+            <option value="suffix">${esc(T.suggest_mode_suffix)}</option>
+            <option value="contest">${esc(T.suggest_mode_contest)}</option>
+          </select>
           <select id="suggestDigit" aria-label="${esc(T.suggest_digit_label)}">
             <option value="">${esc(T.suggest_digit_any)}</option>
             ${"0123456789".split("").map(d => `<option value="${d}">OK${d}</option>`).join("")}
@@ -836,16 +868,48 @@
       </div>`;
 
       const suggestForm = document.getElementById("suggestForm");
+      const suggestPrefix = document.getElementById("suggestPrefix");
       const suggestInput = document.getElementById("suggestInput");
+      const suggestMode = document.getElementById("suggestMode");
       const suggestDigit = document.getElementById("suggestDigit");
       const suggestMeta = document.getElementById("suggestMeta");
       const suggestResult = document.getElementById("suggestResult");
+
+      const zeroOption = [...suggestDigit.options].find(o => o.value === "0");
+      // popisky číslic reflektují zvolený prefix (OK0.. / OL0..)
+      function refreshDigitLabels() {
+        const p = suggestPrefix.value;
+        [...suggestDigit.options].forEach(opt => {
+          if (opt.value) opt.textContent = p + opt.value;
+        });
+      }
+      // OK0 + 1 písmeno neexistuje (klubové/speciální stanice), OL0 ano –
+      // v závodním režimu zakázat 0 jen u prefixu OK
+      function refreshZeroOption() {
+        if (!zeroOption) return;
+        const disable = suggestMode.value === "contest" && suggestPrefix.value === "OK";
+        zeroOption.disabled = disable;
+        if (disable && suggestDigit.value === "0") suggestDigit.value = "";
+      }
+      // v závodním režimu se text nezadává (skládá se z číslic × písmen)
+      function refreshMode() {
+        const contest = suggestMode.value === "contest";
+        suggestInput.disabled = contest;
+        if (contest) suggestInput.value = "";
+        suggestInput.placeholder = suggestMode.value === "suffix"
+          ? T.suggest_placeholder_suffix : T.suggest_placeholder;
+        refreshZeroOption();
+      }
+      suggestPrefix.addEventListener("change", () => { refreshDigitLabels(); refreshZeroOption(); });
+      suggestMode.addEventListener("change", refreshMode);
 
       suggestInput.focus();
       suggestForm.addEventListener("submit", async e => {
         e.preventDefault();
         const text = suggestInput.value.trim();
-        if (!text) {
+        const prefix = suggestPrefix.value;
+        const mode = suggestMode.value;
+        if (mode !== "contest" && !text) {
           suggestMeta.textContent = "";
           suggestResult.innerHTML = `<div class="suggest-empty">${esc(T.suggest_empty)}</div>`;
           return;
@@ -854,7 +918,13 @@
         suggestMeta.textContent = "";
         suggestResult.textContent = T.suggest_loading;
         try {
-          const query = new URLSearchParams({ text });
+          const query = new URLSearchParams({ prefix, limit: "150" });
+          if (mode === "contest") {
+            query.set("contest", "true");
+          } else {
+            query.set("text", text);
+            if (mode === "suffix") query.set("contains", "true");
+          }
           const selectedDigit = suggestDigit.value;
           if (selectedDigit) query.set("digit", selectedDigit);
           const r = await fetch("/api/suggest-callsign?" + query.toString());
@@ -877,10 +947,28 @@
             return;
           }
 
+          // stav volnosti: název i tooltip (u historických značek s datem konce ochrany)
+          const freedomLabel = f => ({
+            never_used: T.freedom_never,
+            protection_elapsed: T.freedom_elapsed,
+            recently_lapsed: T.freedom_lapsed,
+          }[f] || "");
+          const freedomTitle = x => {
+            const base = freedomLabel(x.freedom);
+            return x.protection_ended
+              ? `${base} · ${T.freedom_until.replace("{date}", x.protection_ended)}`
+              : base;
+          };
           suggestResult.innerHTML = `<div class="suggest-list">${d.suggestions.map(x =>
-            `<button type="button" class="cs-item" data-cs="${x.callsign}">
-               ${x.callsign}<small>${esc(T.suggest_suffix)} ${x.suffix}</small>
-             </button>`).join("")}</div>`;
+            `<button type="button" class="cs-item freedom-${x.freedom}" data-cs="${x.callsign}" title="${esc(freedomTitle(x))}">
+               <span class="freedom-dot freedom-${x.freedom}"></span>${x.callsign}<small>${esc(T.suggest_suffix)} ${x.suffix}</small>
+             </button>`).join("")}</div>
+            <div class="suggest-legend">
+              <span><span class="freedom-dot freedom-never_used"></span>${esc(T.freedom_never)}</span>
+              <span><span class="freedom-dot freedom-protection_elapsed"></span>${esc(T.freedom_elapsed)}</span>
+              <span><span class="freedom-dot freedom-recently_lapsed"></span>${esc(T.freedom_lapsed)}</span>
+            </div>
+            <div class="suggest-hint">${esc(T.freedom_caveat)}</div>`;
 
           suggestResult.querySelectorAll(".cs-item").forEach(el => el.addEventListener("click", () => {
             document.getElementById("searchInput").value = el.dataset.cs;

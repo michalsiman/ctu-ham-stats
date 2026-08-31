@@ -85,13 +85,20 @@ def archive_csv(content: str, snapshot_date: date,
     return path
 
 
-def parse_rows(content: str) -> list[tuple[str, int, str]]:
+def parse_rows(content: str, delimiter: str | None = None) -> list[tuple[str, int, str]]:
     """Vrátí seznam (callsign, reference, valid_until_iso_date).
 
     Sloupce CSV: ID, "Volací značka", "Číslo reference", "Platnost do"
+
+    Oddělovač se autodetekuje z prvního řádku (starší exporty ČTÚ používají
+    středník, novější čárku); lze ho vynutit parametrem `delimiter`.
     """
+    if delimiter is None:
+        first_line = content.splitlines()[0] if content else ""
+        delimiter = ";" if first_line.count(";") > first_line.count(",") else ","
+
     rows: list[tuple[str, int, str]] = []
-    reader = csv.DictReader(io.StringIO(content))
+    reader = csv.DictReader(io.StringIO(content), delimiter=delimiter)
     for raw in reader:
         try:
             callsign = (raw.get("Volací značka") or "").strip().upper()

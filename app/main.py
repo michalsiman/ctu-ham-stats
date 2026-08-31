@@ -26,6 +26,14 @@ _BOT_UA_RE = re.compile(
 )
 _CALLSIGN_INPUT_RE = re.compile(r"^(OK|OL)\d+[0-9A-Z]*$")
 
+# MCP server je volitelný – když balíček `mcp` chybí nebo má nekompatibilní API,
+# aplikace nastartuje bez /mcp.
+try:
+    from . import mcp_server
+except Exception as exc:  # noqa: BLE001
+    mcp_server = None
+    log.warning("MCP server nedostupný (%s) – endpoint /mcp se nenamountuje", exc)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -45,12 +53,23 @@ async def lifespan(app: FastAPI):
         "Plánovač spuštěn – ingest v %s",
         ", ".join(f"{h:02d}:{m:02d}" for h, m in times),
     )
-    yield
-    scheduler.shutdown()
+    try:
+        if mcp_server is not None:
+            # session manager namountované MCP sub-appky se musí spustit ručně –
+            # lifespan mountované ASGI appky se v FastAPI sám nevolá
+            async with mcp_server.mcp.session_manager.run():
+                log.info("MCP server naběhl na /mcp")
+                yield
+        else:
+            yield
+    finally:
+        scheduler.shutdown()
 
 
 app = FastAPI(title="ČTÚ Ham Stats", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
+if mcp_server is not None:
+    app.mount("/mcp", mcp_server.asgi_app)
 
 
 def _extract_client_ip(request: Request) -> str:
@@ -214,21 +233,46 @@ def api_new_callsigns(days: int = Query(30, ge=1, le=730)):
 
 @app.get("/api/suggest-callsign")
 def api_suggest_callsign(
-    text: str = Query(..., max_length=80),
+    text: str = Query("", max_length=80),
+    prefix: str = Query("OK", pattern="^(OK|OL)$"),
     digit: str | None = Query(None, pattern="^[0-9]$"),
-    limit: int = Query(48, ge=1, le=80),
+    contest: bool = Query(False),
+    contains: bool = Query(False),
+    limit: int = Query(48, ge=1, le=260),
 ):
-    normalized = stats.normalize_suggestion_seed(text)
-    if not normalized:
-        raise HTTPException(
-            400,
-            "Zadejte text obsahující alespoň jedno písmeno bez diakritiky nebo speciálních znaků.",
-        )
     conn = db.connect()
     try:
-        return masking.mask_data(stats.suggest_callsigns(conn, text, limit, digit))
+        if contest:
+            # závodní režim: enumerace volných {prefix}{číslice}{1 písmeno}, text se neřeší
+            return masking.mask_data(stats.suggest_contest_callsigns(conn, prefix, digit, limit))
+        normalized = stats.normalize_suggestion_seed(text)
+        if not normalized:
+            raise HTTPException(
+                400,
+                "Zadejte text obsahující alespoň jedno písmeno bez diakritiky nebo speciálních znaků.",
+            )
+        if contains:
+            # režim „v příponě“: volné značky, jejichž přípona (do 3 písmen) obsahuje text
+            if len(normalized) > 3:
+                raise HTTPException(400, "Pro hledání v příponě zadejte nejvýš 3 písmena.")
+            return masking.mask_data(stats.suggest_by_suffix_contains(conn, text, prefix, digit, limit))
+        return masking.mask_data(stats.suggest_callsigns(conn, text, limit, digit, prefix))
     finally:
         conn.close()
+
+
+@app.get("/api/free-after-protection")
+def api_free_after_protection(
+    years: int = Query(5, ge=1, le=20),
+    include_occasional: bool = Query(False),
+):
+    conn = db.connect()
+    try:
+        result = stats.freed_after_protection(conn, years, include_occasional)
+    finally:
+        conn.close()
+    # pozor: „kandidáti na uvolnění“, ne jistota – viz confidence v položkách
+    return masking.mask_data({"years": years, "count": len(result), "callsigns": result})
 
 
 @app.get("/api/callsign/{callsign}")
