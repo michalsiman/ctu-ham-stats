@@ -138,6 +138,51 @@ def free_after_protection(years: int = 5, include_occasional: bool = False) -> d
 
 
 @mcp.tool()
+def new_callsigns(days: int = 30) -> dict:
+    """Seznam nově vzniklých značek za posledních `days` dní (poprvé se
+    objevily v datech). Značky z prvního dne archivu se nezapočítávají –
+    historii dozadu nelze dohnat."""
+    conn = db.connect()
+    try:
+        callsigns = stats.new_callsigns_list(conn, days)
+        return masking.mask_data({"days": days, "count": len(callsigns), "callsigns": callsigns})
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def breakdown() -> dict:
+    """Rozložení aktuálních značek zvlášť pro OK a OL: počty podle prefixu,
+    podle číslice za prefixem a podle délky přípony."""
+    conn = db.connect()
+    try:
+        return masking.mask_data(stats.breakdown(conn) or {})
+    finally:
+        conn.close()
+
+
+@mcp.tool()
+def stations(kind: str) -> dict:
+    """Seznam značek daného druhu (abecedně, s max. platností na značku).
+
+    `kind`:
+    - `unattended` – neobsluhovaná zařízení (převaděče, majáky…): OK + číslo 0
+    - `special` – speciální/příležitostné značky (víceciferné číslo, např. OL700…)
+    - `club` – klubové stanice (OK1/OK2 + tři písmena začínající K/O/R)
+    """
+    kind = kind.strip().lower()
+    valid_kinds = ("unattended", "special", "club")
+    if kind not in valid_kinds:
+        return {"error": "neplatný kind", "valid_kinds": list(valid_kinds)}
+    conn = db.connect()
+    try:
+        result = stats.station_list(conn, kind)
+        return masking.mask_data({"kind": kind, "count": len(result), "callsigns": result})
+    finally:
+        conn.close()
+
+
+@mcp.tool()
 def callsign_lookup(callsign: str) -> dict:
     """Historie a stav konkrétní volací značky."""
     conn = db.connect()

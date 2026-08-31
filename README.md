@@ -100,6 +100,9 @@ Aplikace vystavuje **MCP server** (Model Context Protocol) na `/mcp` – streama
 | `daily_trend` | časová řada denních statistik za N dní |
 | `suggest_callsign` | návrh volných značek (režimy: ze jména / `contains` v sufixu / `contest`), s polem `freedom` |
 | `expiring_soon` | značky expirující do N dnů |
+| `new_callsigns` | nově vzniklé značky za N dní (jako `/api/new-callsigns`) |
+| `breakdown` | rozložení značek OK/OL podle prefixu, číslice a délky přípony |
+| `stations` | seznam značek druhu `unattended` / `special` / `club` |
 | `free_after_protection` | kandidáti na uvolnění po ochranné lhůtě (`confidence: candidate`) |
 | `callsign_lookup` | historie a stav konkrétní značky |
 
