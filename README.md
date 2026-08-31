@@ -107,6 +107,19 @@ Vyžaduje balíček `mcp` (v requirements). Když chybí nebo má nekompatibiln�
 nastartuje i bez `/mcp`. Žádný push/webhook – vyhodnocení událostí (např. hlídání
 `free_after_protection`) si řeší agent sám.
 
+**Nasazení za reverzní proxy:** MCP transport má ochranu proti DNS-rebindingu a ve
+výchozím stavu povolí jen `localhost` – na veřejné doméně by jinak vracel
+`421 Invalid Host header`. Do sekce `[mcp]` v `config.ini` (nebo přes env
+`MCP_ALLOWED_HOSTS`) proto uveď veřejné hostname webu, oddělené čárkou:
+
+```ini
+[mcp]
+allowed_hosts = stats.example.cz
+```
+
+Prázdná hodnota ochranu vypne (má-li ji řešit proxy). Klienti se připojují na
+`/mcp` (koncové lomítko `/mcp/` je povinné, endpoint na něj přesměruje).
+
 ## Testy
 
 ```bash

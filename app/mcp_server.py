@@ -8,7 +8,9 @@ Import je verzně odolný: SDK `mcp` v2 přejmenovalo `FastMCP` na `MCPServer`.
 Zkoušíme obojí; když balíček chybí nebo má nekompatibilní API, `main.py`
 import odchytí a aplikace nastartuje bez /mcp.
 """
-from . import db, masking, stats
+from mcp.server.transport_security import TransportSecuritySettings
+
+from . import config, db, masking, stats
 
 try:  # mcp >= 2
     from mcp.server.mcpserver import MCPServer as _Server
@@ -16,6 +18,26 @@ except ImportError:  # mcp < 2
     from mcp.server.fastmcp import FastMCP as _Server
 
 mcp = _Server("ctu-ham-stats")
+
+
+def _transport_security() -> TransportSecuritySettings:
+    """Ochrana /mcp proti DNS-rebindingu podle configu.
+
+    SDK jinak (host=127.0.0.1) povolí jen localhost a za reverzní proxy vrací
+    na veřejné doméně 421 „Invalid Host header". Do allowlistu proto přidáme
+    hostname z configu; localhost necháme vždy (lokální vývoj, health-check).
+    Prázdný `allowed_hosts` v configu = ochranu vypnout (řeší proxy).
+    """
+    hosts = config.mcp_allowed_hosts()
+    if not hosts:
+        return TransportSecuritySettings(enable_dns_rebinding_protection=False)
+    localhost = ["127.0.0.1", "127.0.0.1:*", "localhost", "localhost:*", "[::1]:*"]
+    origins = [scheme + h for h in hosts for scheme in ("https://", "http://")]
+    return TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=hosts + localhost,
+        allowed_origins=origins,
+    )
 
 
 @mcp.tool()
@@ -127,4 +149,7 @@ def callsign_lookup(callsign: str) -> dict:
 
 # Postaví se hned při importu, aby vznikl session_manager (potřebný v lifespanu
 # main.py). Endpoint je na kořeni sub-appky, mount v main.py ho dá pod /mcp.
-asgi_app = mcp.streamable_http_app(streamable_http_path="/")
+asgi_app = mcp.streamable_http_app(
+    streamable_http_path="/",
+    transport_security=_transport_security(),
+)
