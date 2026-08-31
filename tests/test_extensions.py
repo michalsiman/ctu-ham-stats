@@ -213,6 +213,31 @@ def test_freed_returns_only_expired_standard_with_confidence(conn):
     assert "OL70OU" in {r["callsign"] for r in freed_occ}
 
 
+def test_longest_expired_orders_oldest_first_and_filters(conn):
+    today = date.today()
+    old = today.replace(year=today.year - 3).isoformat()   # vypršela dávno
+    newer = today.replace(year=today.year - 1).isoformat()  # vypršela nedávno
+    future = today.replace(year=today.year + 1).isoformat()  # zmizela, ale ještě platná
+
+    _seed_two_snapshots(conn, [
+        ("OK1OLD", 1, old),        # nejdéle expirovaná → první
+        ("OK2NEW", 2, newer),      # expirovaná později
+        ("OL70OU", 3, old),        # příležitostná → bez include_occasional vynechat
+        ("OK3FUT", 4, future),     # platnost neuplynula → vynechat
+    ])
+
+    res = stats.longest_expired(conn)
+    calls = [r["callsign"] for r in res]
+    assert calls[0] == "OK1OLD"                 # nejstarší expirace nahoře
+    assert calls.index("OK1OLD") < calls.index("OK2NEW")
+    assert "OL70OU" not in calls                # příležitostná vynechána
+    assert "OK3FUT" not in calls                # ještě platná vynechána
+    assert res[0]["expired_days_ago"] > res[calls.index("OK2NEW")]["expired_days_ago"]
+
+    with_occ = [r["callsign"] for r in stats.longest_expired(conn, include_occasional=True)]
+    assert "OL70OU" in with_occ
+
+
 def test_freed_edge_exactly_on_boundary(conn):
     today = date.today()
     boundary = stats._add_years(today, -5).isoformat()  # přesně 5 let zpět → free_date == dnes
