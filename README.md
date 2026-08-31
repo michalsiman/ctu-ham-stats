@@ -120,6 +120,45 @@ allowed_hosts = stats.example.cz
 Prázdná hodnota ochranu vypne (má-li ji řešit proxy). Klienti se připojují na
 `/mcp` (koncové lomítko `/mcp/` je povinné, endpoint na něj přesměruje).
 
+### Připojení AI klienta
+
+Endpoint je **streamable HTTP** MCP, bez autentizace, read-only. URL je
+`https://VAS-HOST/mcp/` (s koncovým lomítkem). Veřejná instance:
+`https://stats.ok1sim.cz/mcp/`.
+
+**Claude Desktop / Claude Code** – přidej server do konfigurace (`claude_desktop_config.json`,
+resp. `claude mcp add`):
+
+```json
+{
+  "mcpServers": {
+    "ctu-ham-stats": {
+      "type": "http",
+      "url": "https://stats.ok1sim.cz/mcp/"
+    }
+  }
+}
+```
+
+Případně přes CLI:
+
+```bash
+claude mcp add --transport http ctu-ham-stats https://stats.ok1sim.cz/mcp/
+```
+
+**Jiní klienti** (Cursor, Cline, vlastní agent přes `mcp` SDK…) očekávají typ
+transportu `http` / `streamable-http` a stejnou URL. Server je bezstavově
+dotazovatelný – po `initialize` rovnou volej nástroje z tabulky výše.
+
+**Rychlý test bez klienta** (mělo by vrátit `HTTP 200` a `serverInfo`):
+
+```bash
+curl -sS -w '\nHTTP %{http_code}\n' https://stats.ok1sim.cz/mcp/ \
+  -X POST -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}'
+```
+
 ## Testy
 
 ```bash
