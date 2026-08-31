@@ -103,6 +103,7 @@ Aplikace vystavuje **MCP server** (Model Context Protocol) na `/mcp` – streama
 | `new_callsigns` | nově vzniklé značky za N dní (jako `/api/new-callsigns`) |
 | `breakdown` | rozložení značek OK/OL podle prefixu, číslice a délky přípony |
 | `stations` | seznam značek druhu `unattended` / `special` / `club` |
+| `longest_expired` | značky s nejstarší vypršelou platností (nejdéle „mrtvé", jen v rámci archivu) |
 | `free_after_protection` | kandidáti na uvolnění po ochranné lhůtě (`confidence: candidate`) |
 | `callsign_lookup` | historie a stav konkrétní značky |
 

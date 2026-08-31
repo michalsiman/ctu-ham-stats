@@ -138,6 +138,26 @@ def free_after_protection(years: int = 5, include_occasional: bool = False) -> d
 
 
 @mcp.tool()
+def longest_expired(limit: int = 20, include_occasional: bool = False) -> dict:
+    """Značky, jejichž platnost vypršela nejdříve (nejdéle „mrtvé") a které už
+    nejsou v posledních datech – seřazené od nejstarší expirace.
+
+    POZOR: archiv začíná až od `archive_since`, takže jde o nejstarší
+    POZOROVATELNÉ expirace, ne nutně nejstarší v realitě. `include_occasional=
+    True` přidá i příležitostné/speciální značky (jinak vynechány)."""
+    conn = db.connect()
+    try:
+        result = stats.longest_expired(conn, limit, include_occasional)
+        return masking.mask_data({
+            "archive_since": stats.earliest_snapshot(conn),
+            "count": len(result),
+            "callsigns": result,
+        })
+    finally:
+        conn.close()
+
+
+@mcp.tool()
 def new_callsigns(days: int = 30) -> dict:
     """Seznam nově vzniklých značek za posledních `days` dní (poprvé se
     objevily v datech). Značky z prvního dne archivu se nezapočítávají –

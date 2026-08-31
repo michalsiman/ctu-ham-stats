@@ -784,6 +784,56 @@ def freed_after_protection(
     return out
 
 
+def longest_expired(
+    conn: sqlite3.Connection,
+    limit: int = 20,
+    include_occasional: bool = False,
+) -> list[dict]:
+    """Značky nepřítomné v posledním snapshotu, jejichž platnost vypršela
+    nejdříve – seřazené od nejdéle 'mrtvých'.
+
+    POZOR: archiv začíná od prvního snapshotu (viz `earliest_snapshot`), takže
+    jde o nejstarší POZOROVATELNÉ expirace, ne nutně nejstarší v realitě – řada
+    z těchto značek se objevila jen v prvním snapshotu a hned zmizela.
+
+    `include_occasional=False` vynechá příležitostné/speciální značky
+    (nestandardní tvar, např. OL150KR), které přirozeně vyprší a mizí.
+    """
+    latest = latest_snapshot(conn)
+    if not latest:
+        return []
+
+    rows = conn.execute(
+        """
+        SELECT callsign, MAX(valid_until) AS last_valid, MAX(last_seen) AS last_seen
+        FROM licenses
+        WHERE callsign NOT IN (
+            SELECT callsign FROM callsigns WHERE last_seen = ?
+        )
+        GROUP BY callsign
+        """,
+        (latest,),
+    ).fetchall()
+
+    today = date.today()
+    out: list[dict] = []
+    for row in rows:
+        callsign = row["callsign"]
+        if not include_occasional and not _STANDARD_CALLSIGN_RE.match(callsign):
+            continue
+        last_valid = date.fromisoformat(row["last_valid"])
+        if last_valid >= today:  # zmizela, ale platnost ještě neuplynula – není „expirovaná"
+            continue
+        out.append({
+            "callsign": callsign,
+            "valid_until": last_valid.isoformat(),
+            "last_seen": row["last_seen"],
+            "expired_days_ago": (today - last_valid).days,
+        })
+    out.sort(key=lambda r: (r["valid_until"], r["callsign"]))
+    return out[:limit]
+
+
 def expiring_count(conn: sqlite3.Connection, days: int) -> int | None:
     """Počet značek, jejichž poslední platnost končí do `days` dnů.
 
