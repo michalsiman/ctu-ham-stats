@@ -139,7 +139,7 @@ def index(request: Request, lang: str | None = None):
 
         data = {
             "summary": masking.mask_data(stats.summary(conn)),
-            "series": masking.mask_data(stats.daily_series(conn)),
+            "series": masking.mask_data(stats.daily_series(conn, limit=3650)),
             "breakdown": masking.mask_data(stats.breakdown(conn)),
             "t": i18n.translations(chosen),
             "lang": chosen,
