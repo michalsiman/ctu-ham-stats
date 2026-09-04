@@ -1273,16 +1273,22 @@
     setInterval(renderFreshness, 60000);  // ať relativní čas neztuhne
 
     const series = {{ series | tojson }};
+    const chartSeries = series.flatMap((point, index) => (
+      index > 0 && point.reconstructed
+        ? [{ snapshot_date: "", unique_callsigns: null }, point]
+        : [point]
+    ));
     new Chart(document.getElementById("dailyChart"), {
       type: "line",
       data: {
-        labels: series.map(d => d.snapshot_date),
+        labels: chartSeries.map(d => d.snapshot_date),
         datasets: [{
           label: T.chart_daily,
-          data: series.map(d => d.unique_callsigns),
+          data: chartSeries.map(d => d.unique_callsigns),
           borderColor: "#ffb454",
           backgroundColor: "rgba(255,180,84,.12)",
           fill: true,
+          spanGaps: false,
           tension: .25,
           pointRadius: series.length > 60 ? 0 : 3,
         }]
