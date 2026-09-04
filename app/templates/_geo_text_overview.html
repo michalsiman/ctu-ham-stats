@@ -1,0 +1,31 @@
+<div class="geo-text-grid">
+  {% set regions = [
+    ("Hlavní město Praha", ["Praha"]),
+    ("Středočeský kraj", ["Benešov", "Beroun", "Kladno", "Kolín", "Kutná Hora", "Mladá Boleslav", "Mělník", "Nymburk", "Praha-východ", "Praha-západ", "Příbram", "Rakovník"]),
+    ("Jihočeský kraj", ["České Budějovice", "Český Krumlov", "Jindřichův Hradec", "Písek", "Prachatice", "Strakonice", "Tábor"]),
+    ("Plzeňský kraj", ["Domažlice", "Klatovy", "Plzeň-jih", "Plzeň-město", "Plzeň-sever", "Rokycany", "Tachov"]),
+    ("Karlovarský kraj", ["Cheb", "Karlovy Vary", "Sokolov"]),
+    ("Ústecký kraj", ["Děčín", "Chomutov", "Litoměřice", "Louny", "Most", "Teplice", "Ústí nad Labem"]),
+    ("Liberecký kraj", ["Česká Lípa", "Jablonec nad Nisou", "Liberec", "Semily"]),
+    ("Královéhradecký kraj", ["Hradec Králové", "Jičín", "Náchod", "Rychnov nad Kněžnou", "Trutnov"]),
+    ("Pardubický kraj", ["Chrudim", "Pardubice", "Svitavy", "Ústí nad Orlicí"]),
+    ("Kraj Vysočina", ["Havlíčkův Brod", "Jihlava", "Pelhřimov", "Třebíč", "Žďár nad Sázavou"]),
+    ("Jihomoravský kraj", ["Blansko", "Brno-město", "Brno-venkov", "Břeclav", "Hodonín", "Vyškov", "Znojmo"]),
+    ("Olomoucký kraj", ["Jeseník", "Olomouc", "Prostějov", "Přerov", "Šumperk"]),
+    ("Moravskoslezský kraj", ["Bruntál", "Frýdek-Místek", "Karviná", "Nový Jičín", "Opava", "Ostrava-město"]),
+    ("Zlínský kraj", ["Kroměříž", "Uherské Hradiště", "Vsetín", "Zlín"])
+  ] %}
+  {% for region_name, districts in regions %}
+  <div class="geo-region-card">
+    <div class="geo-region-title">{{ region_name }}</div>
+    <ul class="geo-district-list">
+      {% for district in districts %}
+      <li class="geo-district-item">
+        <span class="geo-district-name">{{ district }}</span>
+        <span class="geo-district-val">—</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endfor %}
+</div>

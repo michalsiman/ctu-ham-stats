@@ -3,6 +3,10 @@
         "/^source \\.venv/bin/activate && python -c 'from app\\.main import templates; templates\\.get_template\\(\"_district_areas\\.html\"\\); print\\(\"district names template OK\"\\)' && python -m pytest tests/ -q$/": {
             "approve": true,
             "matchCommandLine": true
+        },
+        "/^source \\.venv/bin/activate && python -c 'from app\\.main import templates; \\[templates\\.get_template\\(n\\) for n in \\(\"index\\.html\", \"_districts\\.html\", \"_regions\\.html\", \"_district_areas\\.html\", \"_geo_text_overview\\.html\"\\)\\]; print\\(\"all templates OK\"\\)' && python -m pytest tests/ -q 2>&1 \\| tail -2$/": {
+            "approve": true,
+            "matchCommandLine": true
         }
     }
 }
