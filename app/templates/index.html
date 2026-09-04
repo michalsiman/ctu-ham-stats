@@ -541,6 +541,7 @@
     vector-effect: non-scaling-stroke;
   }
   .cz-map .region-polygons { display: none; }
+  .cz-map .region-arcs-old { display: none; }
   .cz-map .country-border {
     fill: none;
     stroke: var(--lcd-dim);
@@ -866,7 +867,7 @@
         <path class="region" d="M 740 352 L 787 362 L 803 380 L 817 360 L 842 362 L 855 350 L 848 325 L 826 317 L 820 278 L 791 273 L 789 279 L 754 250 L 755 262 L 740 267 L 723 259 L 700 232 L 720 223 L 712 199 L 703 211 L 683 211 L 657 235 L 645 286 L 654 298 L 671 289 L 675 303 L 686 287 L 692 307 L 711 311 L 712 325 L 740 352 Z" />
         <path class="region" d="M 707 485 L 736 471 L 741 453 L 757 451 L 772 401 L 799 389 L 787 362 L 731 355 L 722 372 L 704 369 L 705 379 L 689 379 L 685 388 L 671 377 L 671 390 L 644 408 L 652 422 L 641 442 L 654 439 L 655 450 L 695 467 L 707 485 Z" />
       </g>
-      <g aria-label="Hranice krajů">
+      <g class="region-arcs-old" aria-hidden="true">
         <path class="region" d="M 444 290 L 435 303 L 410 310 L 404 322 L 411 337 L 380 339 L 374 350" />
         <path class="region" d="M 374 350 L 354 336 L 340 359 L 293 347 L 232 357" />
         <path class="region" d="M 232 357 L 240 277 L 202 255 L 187 257 L 188 245" />
@@ -893,6 +894,34 @@
         <path class="region" d="M 740 352 L 722 372 L 704 369 L 705 379 L 689 379 L 685 388 L 671 377 L 671 390 L 647 403" />
         <path class="region" d="M 680 214 L 703 211 L 712 199 L 719 205 L 720 223 L 700 232 L 734 268 L 755 262 L 754 250 L 789 279 L 791 273 L 820 278 L 826 317 L 849 325 L 854 356 L 819 358 L 799 380" />
         <path class="region" d="M 799 380 L 796 393 L 768 408 L 759 448 L 741 453 L 736 471 L 707 485" />
+      </g>
+      <g aria-label="Hranice krajů">
+        <path class="region" d="M 297 238 L 325 228 L 347 246 L 339 264 L 325 261 L 309 274 L 288 243 L 297 238" />
+        <path class="region" d="M 444 290 L 435 303 L 410 310 L 404 322 L 411 337 L 380 339 L 374 350" />
+        <path class="region" d="M 374 350 L 354 336 L 340 359 L 293 347 L 232 357" />
+        <path class="region" d="M 232 357 L 240 277 L 202 255 L 187 257 L 188 245" />
+        <path class="region" d="M 188 245 L 203 226 L 244 216 L 261 196 L 305 195 L 304 180 L 318 176 L 320 165" />
+        <path class="region" d="M 320 165 L 345 170 L 372 143 L 401 162" />
+        <path class="region" d="M 401 162 L 395 190 L 411 207 L 429 208 L 425 235 L 436 242" />
+        <path class="region" d="M 436 242 L 427 255 L 448 270 L 444 290" />
+        <path class="region" d="M 374 350 L 373 396 L 400 414 L 424 414 L 435 434 L 452 432 L 456 442 L 442 457 L 455 467" />
+        <path class="region" d="M 455 467 L 449 474" />
+        <path class="region" d="M 205 463 L 210 428 L 223 425 L 235 386 L 232 357" />
+        <path class="region" d="M 83 281 L 129 278 L 150 256 L 166 264 L 175 244" />
+        <path class="region" d="M 175 244 L 188 245" />
+        <path class="region" d="M 132 184 L 165 195 L 164 221 L 173 230 L 166 237 L 175 244" />
+        <path class="region" d="M 336 97 L 326 109 L 315 106 L 302 134 L 320 165" />
+        <path class="region" d="M 448 112 L 460 162 L 441 157 L 431 170 L 401 162" />
+        <path class="region" d="M 576 235 L 564 231 L 545 255 L 529 255 L 495 230 L 436 242" />
+        <path class="region" d="M 611 224 L 604 257 L 592 263 L 595 296 L 609 318 L 603 341" />
+        <path class="region" d="M 603 341 L 573 334 L 571 342 L 553 344" />
+        <path class="region" d="M 553 344 L 506 314 L 495 324 L 478 305 L 444 290" />
+        <path class="region" d="M 553 344 L 551 369 L 544 366 L 533 380 L 541 396 L 530 430 L 536 436 L 519 450 L 500 445 L 472 467 L 455 467" />
+        <path class="region" d="M 603 341 L 595 351 L 607 353 L 603 377 L 610 383 L 617 373 L 610 364 L 621 361 L 647 403" />
+        <path class="region" d="M 647 403 L 652 426 L 641 442 L 654 439 L 655 450 L 695 467 L 707 485" />
+        <path class="region" d="M 680 214 L 657 235 L 645 286 L 654 298 L 671 289 L 675 303 L 686 287 L 692 307 L 711 311 L 712 325 L 740 352" />
+        <path class="region" d="M 740 352 L 722 372 L 704 369 L 705 379 L 689 379 L 685 388 L 671 377 L 671 390 L 647 403" />
+        <path class="region" d="M 799 380 L 787 362 L 740 352" />
       </g>
       <use href="#country-outline" class="country-border" />
       <g aria-label="{{ t.map_cities }}">
