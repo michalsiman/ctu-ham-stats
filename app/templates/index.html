@@ -518,6 +518,43 @@
     margin-bottom: 10px;
   }
   .panel-title .totals { float: right; color: var(--lcd-dim); text-transform: none; letter-spacing: normal; }
+  .map-panel {
+    margin-top: 12px;
+    overflow: hidden;
+  }
+  .cz-map {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 430px;
+  }
+  .cz-map .country {
+    fill: #171b20;
+    stroke: var(--lcd-dim);
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+  }
+  .cz-map .boundary-grid {
+    fill: none;
+    stroke: #3a4049;
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+  .cz-map .city-dot { fill: var(--lcd); }
+  .cz-map .city-label {
+    fill: var(--text);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 13px;
+    letter-spacing: 0;
+    paint-order: stroke;
+    stroke: var(--panel);
+    stroke-linejoin: round;
+    stroke-width: 4px;
+  }
+  @media (max-width: 520px) {
+    .chart-panel.map-panel { padding: 10px; }
+    .cz-map .city-label { font-size: 11px; }
+  }
   footer { margin-top: 32px; font-size: .78rem; color: var(--muted); }
   footer a { color: var(--muted); }
   .scroll-top-fab {
@@ -794,6 +831,46 @@
     </div>
   </section>
   {% endif %}
+
+  <section class="chart-panel map-panel" aria-labelledby="mapTitle">
+    <div class="panel-title" id="mapTitle">{{ t.map_czechia }}</div>
+    <svg class="cz-map" viewBox="0 0 900 430" role="img" aria-labelledby="mapTitle mapDescription">
+      <desc id="mapDescription">{{ t.map_czechia }}</desc>
+      <defs>
+        <clipPath id="cz-outline">
+          <path d="M95 184 L72 158 L92 132 L131 128 L144 101 L182 96 L203 67 L239 79 L271 57 L310 67 L338 49 L372 63 L404 52 L433 72 L473 64 L504 83 L543 76 L571 95 L618 88 L643 105 L681 100 L710 121 L747 118 L780 143 L808 145 L834 174 L823 203 L845 230 L830 258 L839 286 L809 303 L793 329 L756 337 L730 361 L687 352 L660 373 L621 362 L591 381 L551 371 L522 390 L483 378 L455 394 L417 379 L385 390 L353 370 L322 379 L292 356 L256 361 L229 338 L192 339 L170 315 L132 308 L120 281 L90 266 L98 237 L75 216 Z" />
+        </clipPath>
+      </defs>
+      <path class="country" d="M95 184 L72 158 L92 132 L131 128 L144 101 L182 96 L203 67 L239 79 L271 57 L310 67 L338 49 L372 63 L404 52 L433 72 L473 64 L504 83 L543 76 L571 95 L618 88 L643 105 L681 100 L710 121 L747 118 L780 143 L808 145 L834 174 L823 203 L845 230 L830 258 L839 286 L809 303 L793 329 L756 337 L730 361 L687 352 L660 373 L621 362 L591 381 L551 371 L522 390 L483 378 L455 394 L417 379 L385 390 L353 370 L322 379 L292 356 L256 361 L229 338 L192 339 L170 315 L132 308 L120 281 L90 266 L98 237 L75 216 Z" />
+      <g class="boundary-grid" clip-path="url(#cz-outline)">
+        <path d="M120 105 C180 140 210 150 265 132 S355 96 410 134 S510 160 570 124 S685 114 790 158" />
+        <path d="M76 181 C155 202 202 184 253 216 S355 236 419 197 S533 180 597 221 S724 247 835 211" />
+        <path d="M92 257 C165 238 217 259 277 286 S387 312 442 270 S558 245 622 279 S742 298 823 277" />
+        <path d="M180 82 C177 156 201 225 229 344" />
+        <path d="M293 58 C279 145 300 206 322 371" />
+        <path d="M407 54 C395 147 414 246 417 379" />
+        <path d="M511 79 C486 147 514 245 522 390" />
+        <path d="M620 88 C600 170 628 260 621 362" />
+        <path d="M722 118 C692 194 730 266 730 361" />
+        <path d="M108 143 L206 224 L282 330" />
+        <path d="M166 316 L289 235 L393 106" />
+        <path d="M348 370 L437 240 L540 92" />
+        <path d="M475 378 L598 260 L700 107" />
+        <path d="M587 379 L705 258 L808 167" />
+      </g>
+      <g aria-label="{{ t.map_cities }}">
+        <circle class="city-dot" cx="358" cy="206" r="4" /><text class="city-label" x="367" y="202">Praha</text>
+        <circle class="city-dot" cx="220" cy="220" r="4" /><text class="city-label" x="151" y="216">Plzeň</text>
+        <circle class="city-dot" cx="515" cy="290" r="4" /><text class="city-label" x="524" y="306">Brno</text>
+        <circle class="city-dot" cx="610" cy="245" r="4" /><text class="city-label" x="619" y="241">Olomouc</text>
+        <circle class="city-dot" cx="732" cy="229" r="4" /><text class="city-label" x="741" y="225">Ostrava</text>
+        <circle class="city-dot" cx="330" cy="310" r="4" /><text class="city-label" x="258" y="328">České Budějovice</text>
+        <circle class="city-dot" cx="360" cy="124" r="4" /><text class="city-label" x="369" y="120">Ústí nad Labem</text>
+        <circle class="city-dot" cx="303" cy="143" r="4" /><text class="city-label" x="231" y="139">Most</text>
+        <circle class="city-dot" cx="486" cy="170" r="4" /><text class="city-label" x="495" y="166">Hradec Králové</text>
+      </g>
+    </svg>
+  </section>
 
   <footer>
     {{ t.footer_snapshot }} {{ summary.snapshot_date }} ·
