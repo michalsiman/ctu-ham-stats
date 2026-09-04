@@ -1161,7 +1161,7 @@ def visit_stats_for_range(conn: sqlite3.Connection, days: int, end_day: str | No
         FROM page_visits
         WHERE visited_on >= ? AND visited_on <= ?
         GROUP BY visited_on
-        ORDER BY visited_on ASC
+        ORDER BY visited_on DESC
         """,
         (start_iso, end_iso),
     ).fetchall()
