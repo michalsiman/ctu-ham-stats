@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^source \\.venv/bin/activate && python -c 'from app\\.main import templates; templates\\.get_template\\(\"_district_areas\\.html\"\\); print\\(\"district names template OK\"\\)' && python -m pytest tests/ -q$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}
