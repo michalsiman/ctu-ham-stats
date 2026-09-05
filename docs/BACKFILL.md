@@ -66,12 +66,47 @@ docker compose exec ham-stats python -m app.backfill data/backfill/import_radiov
 docker compose exec ham-stats python -m app.ingest
 ```
 
-### B) Už běžící DB s ostrými daty
+### B) Už běžící DB s ostrými daty a BEZ archivu (doporučeno pro server)
 
-Pak backfill nejde jen „přidat dopředu" (viz výše – rozbil by `first_seen`
-u novějších značek). Nejčistší je **znovu postavit podle A)**. Když opravdu nechceš,
-můžeš vynutit vložení pomocí `--yes`, ale ber, že `added/removed` a `first_seen`
-u dat kolem přechodu nebudou přesné.
+Tohle je případ produkčního serveru: běží denní ingest, DB má poslední nasbíraný
+měsíc, ale `data/archive/` (raw denní CSV) chybí – takže poslední měsíc existuje
+**jen v DB** a postup A) by ho smazal.
+
+Použij **`app.backfill_preserve`**. Vloží staré exporty jako historické snapshoty,
+opraví `first_seen` (posune dozadu tam, kde stará data dokládají dřívější
+existenci), ale **`last_seen` ani `added/removed` živého období se nedotkne** –
+poslední měsíc zůstane přesně jak je. Před zásahem udělá zálohu DB. Je idempotentní.
+
+```bash
+# soubory na místo (stačí ty dva starší – novější už pokrývá živý ingest)
+mkdir -p data/backfill
+cp <odkud>/import_radiove_kmitocty_opravneni-122022.csv   data/backfill/
+cp <odkud>/import_radiove_kmitocty_opravneni06062025.csv  data/backfill/
+
+# jeden příkaz, chronologicky od nejstaršího
+python -m app.backfill_preserve \
+    data/backfill/import_radiove_kmitocty_opravneni-122022.csv 2022-12-15 \
+    data/backfill/import_radiove_kmitocty_opravneni06062025.csv 2025-06-06
+```
+
+V Dockeru (data jsou v bind-mountu `./data`):
+
+```bash
+docker compose exec ham-stats python -m app.backfill_preserve \
+    data/backfill/import_radiove_kmitocty_opravneni-122022.csv 2022-12-15 \
+    data/backfill/import_radiove_kmitocty_opravneni06062025.csv 2025-06-06
+```
+
+Skript vypíše `daily_stats` PŘED a PO a zálohu uloží jako `hamstats.db.bak-<čas>`.
+Kdyby se něco nezdálo, stačí zálohu vrátit zpět. Pokud omylem zadáš datum, které
+už spadá do živého ingestu, skript se zastaví s chybou a nic nezmění.
+
+### C) Už běžící DB, ale archiv MÁŠ
+
+Nejčistší je **znovu postavit podle A)** (nepřijdeš o nic – živá data i archiv se
+dotáhnou zpět). Když nechceš, jde vynutit `app.backfill … --yes`, ale
+`added/removed` a `first_seen` kolem přechodu pak nebudou přesné – proto radši
+A) nebo B).
 
 ## Ověření
 
