@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import config, db, i18n, ingest, masking, stats
+from . import config, db, i18n, ingest, masking, okres, stats
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -48,6 +48,30 @@ async def lifespan(app: FastAPI):
             id=f"ingest-{hour:02d}{minute:02d}",
             misfire_grace_time=3600,
         )
+    # Denní dohledávání okresu (paced sweep přes callbooky → callsign_region).
+    # Jen když je povolené a jsou QRZ creds – jinak nasazení bez přístupů nespadne.
+    if config.OKRES_LOOKUP_ENABLED and config.QRZ_USERNAME and config.QRZ_PASSWORD:
+        try:
+            okres_times = config.okres_lookup_times()
+            for hour, minute in okres_times:
+                scheduler.add_job(
+                    okres.run_okres_lookup,
+                    "cron",
+                    day_of_week=config.OKRES_LOOKUP_DAYS,
+                    hour=hour,
+                    minute=minute,
+                    id=f"okres-{hour:02d}{minute:02d}",
+                    misfire_grace_time=3600,
+                    max_instances=1,
+                    coalesce=True,
+                )
+            log.info(
+                "Plánovač – okres lookup v %s (dny: %s)",
+                ", ".join(f"{h:02d}:{m:02d}" for h, m in okres_times),
+                config.OKRES_LOOKUP_DAYS,
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.warning("Okres lookup job se nepodařilo zaregistrovat: %s", exc)
     scheduler.start()
     log.info(
         "Plánovač spuštěn – ingest v %s",
@@ -300,6 +324,26 @@ def api_ingest():
     except Exception as exc:  # noqa: BLE001
         log.exception("Ingest selhal")
         raise HTTPException(502, f"Ingest selhal: {exc}") from exc
+
+
+@app.post("/api/okres")
+def api_okres():
+    """Ruční spuštění dohledání okresu (paced sweep + promítnutí do callsign_region)."""
+    try:
+        return okres.run_okres_lookup()
+    except Exception as exc:  # noqa: BLE001
+        log.exception("Okres lookup selhal")
+        raise HTTPException(502, f"Okres lookup selhal: {exc}") from exc
+
+
+@app.get("/api/geo")
+def api_geo():
+    """Počty aktuálně platných značek podle okresu a kraje (pro mapu + přehled)."""
+    conn = db.connect()
+    try:
+        return stats.geo_counts(conn)
+    finally:
+        conn.close()
 
 
 @app.get("/visits", response_class=HTMLResponse)

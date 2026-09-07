@@ -52,6 +52,35 @@ CREATE TABLE IF NOT EXISTS page_visits (
 
 CREATE INDEX IF NOT EXISTS idx_page_visits_day_country
 ON page_visits (visited_on, country_code);
+
+-- Odvozený okres ke značce (POC + mapa). PRIVACY-BY-DESIGN: ukládá se výhradně
+-- dvojice značka→okres a nenosobní metadata. Žádné jméno, adresa, PSČ,
+-- souřadnice ani lokátor se sem NIKDY neukládají – z odpovědí callbooků se
+-- v paměti spočítá jen okres a zbytek se zahodí. Veřejně se publikují pouze
+-- agregované počty na okres.
+CREATE TABLE IF NOT EXISTS callsign_okres (
+    callsign   TEXT PRIMARY KEY,
+    okres      TEXT,               -- odvozený okres (NULL = nedohledáno)
+    source     TEXT,               -- zdroj, který okres dodal (qrz/hamqth/qrzcq)
+    method     TEXT,               -- metoda odvození (latlon/grid/zip/obec/znak)
+    found      INTEGER NOT NULL DEFAULT 0,  -- existoval veřejný profil (bool)
+    exhausted  INTEGER NOT NULL DEFAULT 0,  -- vyzkoušeny všechny dostupné zdroje
+    fetched_at TEXT NOT NULL        -- UTC timestamp zpracování
+);
+
+-- Odvozený okres+kraj ke značce obohacený o územní kódy (LAU/NUTS/ISO) pro mapu
+-- a agregované počty. Plní se z callsign_okres přes app.region.refresh_region()
+-- (denní job) nebo importem CSV (scripts/import_okres_csv.py). Nezávislá na
+-- callsign_okres – drží jen značky s vyřešeným okresem.
+CREATE TABLE IF NOT EXISTS callsign_region (
+    callsign  TEXT PRIMARY KEY,
+    okres     TEXT NOT NULL,   -- název okresu
+    okres_lau TEXT NOT NULL,   -- LAU kód okresu (CZ0xxx)
+    kraj      TEXT NOT NULL,   -- název kraje
+    kraj_nuts TEXT NOT NULL,   -- NUTS3 kód kraje (CZ0xx)
+    kraj_iso  TEXT NOT NULL    -- ISO 3166-2 kód kraje (CZ-xx)
+);
+CREATE INDEX IF NOT EXISTS idx_callsign_region_kraj ON callsign_region(kraj_iso);
 """
 
 
