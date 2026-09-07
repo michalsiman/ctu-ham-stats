@@ -894,6 +894,122 @@ def resolve_batch(conn: sqlite3.Connection, work: list, sources: list,
     return resolved
 
 
+def run_sweep(conn: sqlite3.Connection, *, slice_size: int, chunk: int,
+              sleep: float, use_hamqth: bool = True, use_qrzcq: bool = True,
+              retry_failed: bool = False, qrz_count_stop: int | None = None,
+              resolver: "OkresResolver | None" = None) -> dict:
+    """Jeden průběh dohledávání okresu – sdílený pro CLI (main) i denní job.
+
+    Naseeduje nové aktivní značky do fronty (bez lookupu, `fetched_at = datum
+    výskytu` → jdou na konec round-robin fronty), vybere nejdéle nezkoušenou
+    dávku (`okres IS NULL` seřazeno dle `fetched_at`) a po dávkách ji vyřeší.
+    `store_okres()` posune `fetched_at=now`, takže zpracované značky spadnou na
+    konec fronty a cyklus se točí. Vrací statistiku běhu.
+
+    `qrz_count_stop`: při dosažení 24h QRZ Countu se běh gracefully zastaví mezi
+    dávkami (nezpracované značky zůstanou nedotčené a doberou se příště).
+    """
+    latest = conn.execute(
+        "SELECT MAX(snapshot_date) AS d FROM daily_stats"
+    ).fetchone()["d"]
+    total_active = conn.execute(
+        "SELECT COUNT(*) AS n FROM callsigns WHERE last_seen = ?", (latest,)
+    ).fetchone()["n"] if latest else 0
+
+    if resolver is None:
+        resolver = OkresResolver()
+    stats = {"total_active": total_active, "processed": 0, "resolved": 0,
+             "seeded": 0, "stopped_by_limit": False}
+    if not latest:
+        log.warning("Žádný snapshot v daily_stats – není co dohledávat.")
+        return stats
+
+    # CLI --retry-failed: znovu otevři dřív vyčerpané (automatický běh je bere i
+    # bez toho, protože fronta jede jen dle okres IS NULL + fetched_at).
+    if retry_failed:
+        with conn:
+            conn.execute("UPDATE callsign_okres SET exhausted=0 WHERE okres IS NULL")
+
+    # Seed nových aktivních značek do fronty (bez lookupu). fetched_at = datum
+    # výskytu → jdou na konec fronty (odklad prvního pokusu, než si operátor
+    # udělá profil na callbooku).
+    with conn:
+        cur = conn.execute(
+            """
+            INSERT OR IGNORE INTO callsign_okres
+                (callsign, okres, source, method, found, exhausted, fetched_at)
+            SELECT c.callsign, NULL, NULL, NULL, 0, 0,
+                   c.first_seen || 'T00:00:00+00:00'
+            FROM callsigns c
+            WHERE c.last_seen = ?
+            """,
+            (latest,),
+        )
+        stats["seeded"] = cur.rowcount if cur.rowcount and cur.rowcount > 0 else 0
+
+    qrz = QRZClient(config.QRZ_USERNAME, config.QRZ_PASSWORD,
+                    config.QRZ_AGENT, config.QRZ_XML_URL)
+    hamqth = HamQTHClient(config.HAMQTH_USERNAME, config.HAMQTH_PASSWORD,
+                          config.HAMQTH_XML_URL)
+    qrzcq = QRZCQClient(config.QRZCQ_USERNAME, config.QRZCQ_PASSWORD,
+                        config.QRZCQ_XML_URL)
+    primary: list = [("qrz", qrz)]
+    fallbacks: list = []
+    if use_hamqth and hamqth.enabled:
+        fallbacks.append(("hamqth", hamqth))
+    if use_qrzcq and qrzcq.enabled:
+        fallbacks.append(("qrzcq", qrzcq))
+    clients = [c for _, c in primary + fallbacks]
+    try:
+        # QRZ (primární) musí přihlásit; fallbacky při chybě jen přeskočíme.
+        for _, client in primary:
+            client.login()
+        ok_fallbacks: list = []
+        for name, client in fallbacks:
+            try:
+                client.login()
+                ok_fallbacks.append((name, client))
+            except QRZError as exc:
+                log.warning("Zdroj %s vynechán (login selhal): %s", name, exc)
+        all_sources = primary + ok_fallbacks
+        log.info("Aktivní zdroje: %s", [n for n, _ in all_sources])
+
+        # Round-robin fronta: nejdéle nezkoušené nevyřešené aktivní značky.
+        work = [r["callsign"] for r in conn.execute(
+            """
+            SELECT o.callsign FROM callsign_okres o
+            JOIN callsigns c ON c.callsign = o.callsign
+            WHERE o.okres IS NULL AND c.last_seen = ?
+            ORDER BY o.fetched_at ASC
+            LIMIT ?
+            """,
+            (latest, max(1, slice_size)),
+        ).fetchall()]
+        log.info("Ke zpracování: %d nevyřešených (nejdéle nezkoušené první; "
+                 "naseedováno %d nových; aktivních celkem %d)",
+                 len(work), stats["seeded"], total_active)
+
+        chunk = max(1, chunk)
+        for start in range(0, len(work), chunk):
+            if qrz_count_stop is not None and qrz.lookup_count >= qrz_count_stop:
+                log.warning("QRZ 24h Count %d ≥ strop %d – končím, zbytek příště.",
+                            qrz.lookup_count, qrz_count_stop)
+                stats["stopped_by_limit"] = True
+                break
+            part = work[start:start + chunk]
+            log.info("=== dávka %d–%d z %d ===",
+                     start + 1, start + len(part), len(work))
+            stats["resolved"] += resolve_batch(
+                conn, part, all_sources, resolver, sleep)
+            stats["processed"] += len(part)
+        log.info("Celkem vyřešeno s okresem: %d z %d zpracovaných",
+                 stats["resolved"], stats["processed"])
+    finally:
+        for c in clients:
+            c.close()
+    return stats
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="POC dohledání okresu (QRZ + HamQTH)")
     parser.add_argument("--limit", type=int, default=300, help="velikost vzorku (default 300)")
@@ -917,13 +1033,6 @@ def main() -> int:
     conn = db.connect()
     migrate_purge_personal(conn)
     try:
-        latest = conn.execute(
-            "SELECT MAX(snapshot_date) AS d FROM daily_stats"
-        ).fetchone()["d"]
-        total_active = conn.execute(
-            "SELECT COUNT(*) AS n FROM callsigns WHERE last_seen = ?", (latest,)
-        ).fetchone()["n"] if latest else 0
-
         resolver = OkresResolver()
         log.info("Dostupné metody odvození okresu: %s", resolver.available)
         if not any(resolver.available.values()):
@@ -931,66 +1040,23 @@ def main() -> int:
                         "Stáhni data (viz docs/QRZ_POC.md).", GEO_DIR)
 
         if not args.report_only:
-            if args.retry_failed:
-                with conn:
-                    conn.execute(
-                        "UPDATE callsign_okres SET exhausted=0 WHERE okres IS NULL"
-                    )
+            run_sweep(
+                conn,
+                slice_size=args.limit,
+                chunk=args.chunk,
+                sleep=args.sleep,
+                use_hamqth=not args.no_hamqth,
+                use_qrzcq=not args.no_qrzcq,
+                retry_failed=args.retry_failed,
+                resolver=resolver,
+            )
 
-            qrz = QRZClient(config.QRZ_USERNAME, config.QRZ_PASSWORD,
-                            config.QRZ_AGENT, config.QRZ_XML_URL)
-            hamqth = HamQTHClient(config.HAMQTH_USERNAME, config.HAMQTH_PASSWORD,
-                                  config.HAMQTH_XML_URL)
-            qrzcq = QRZCQClient(config.QRZCQ_USERNAME, config.QRZCQ_PASSWORD,
-                                config.QRZCQ_XML_URL)
-
-            # Primární zdroj QRZ + volitelné fallbacky v pořadí.
-            primary: list = [("qrz", qrz)]
-            fallbacks: list = []
-            if not args.no_hamqth and hamqth.enabled:
-                fallbacks.append(("hamqth", hamqth))
-            if not args.no_qrzcq and qrzcq.enabled:
-                fallbacks.append(("qrzcq", qrzcq))
-            clients = [c for _, c in primary + fallbacks]
-            try:
-                # QRZ (primární) musí přihlásit; fallbacky při chybě jen přeskočíme.
-                for name, client in primary:
-                    client.login()
-                ok_fallbacks: list = []
-                for name, client in fallbacks:
-                    try:
-                        client.login()
-                        ok_fallbacks.append((name, client))
-                    except QRZError as exc:
-                        log.warning("Zdroj %s vynechán (login selhal): %s", name, exc)
-                all_sources = primary + ok_fallbacks
-                log.info("Aktivní zdroje: %s", [n for n, _ in all_sources])
-
-                # Pracovní seznam: nové značky (do limitu) + dřívější bez okresu,
-                # u nichž ještě nebyly vyzkoušeny všechny zdroje.
-                new_targets = sample_active_callsigns(conn, args.limit)
-                retry_rows = [r["callsign"] for r in conn.execute(
-                    "SELECT callsign FROM callsign_okres "
-                    "WHERE okres IS NULL AND exhausted = 0"
-                ).fetchall()]
-                work = list(dict.fromkeys(new_targets + retry_rows))
-                log.info("Ke zpracování: %d nových + %d k opětovnému pokusu "
-                         "(aktivních celkem %d)", len(new_targets), len(retry_rows),
-                         total_active)
-                if work:
-                    chunk = max(1, args.chunk)
-                    total_resolved = 0
-                    for start in range(0, len(work), chunk):
-                        part = work[start:start + chunk]
-                        log.info("=== dávka %d–%d z %d ===",
-                                 start + 1, start + len(part), len(work))
-                        total_resolved += resolve_batch(
-                            conn, part, all_sources, resolver, args.sleep)
-                    log.info("Celkem vyřešeno s okresem: %d z %d",
-                             total_resolved, len(work))
-            finally:
-                for c in clients:
-                    c.close()
+        latest = conn.execute(
+            "SELECT MAX(snapshot_date) AS d FROM daily_stats"
+        ).fetchone()["d"]
+        total_active = conn.execute(
+            "SELECT COUNT(*) AS n FROM callsigns WHERE last_seen = ?", (latest,)
+        ).fetchone()["n"] if latest else 0
 
         report = build_report(conn, resolver, total_active)
         REPORT_PATH.write_text(
