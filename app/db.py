@@ -52,6 +52,21 @@ CREATE TABLE IF NOT EXISTS page_visits (
 
 CREATE INDEX IF NOT EXISTS idx_page_visits_day_country
 ON page_visits (visited_on, country_code);
+
+-- Odvozený okres ke značce (POC + mapa). PRIVACY-BY-DESIGN: ukládá se výhradně
+-- dvojice značka→okres a nenosobní metadata. Žádné jméno, adresa, PSČ,
+-- souřadnice ani lokátor se sem NIKDY neukládají – z odpovědí callbooků se
+-- v paměti spočítá jen okres a zbytek se zahodí. Veřejně se publikují pouze
+-- agregované počty na okres.
+CREATE TABLE IF NOT EXISTS callsign_okres (
+    callsign   TEXT PRIMARY KEY,
+    okres      TEXT,               -- odvozený okres (NULL = nedohledáno)
+    source     TEXT,               -- zdroj, který okres dodal (qrz/hamqth/qrzcq)
+    method     TEXT,               -- metoda odvození (latlon/grid/zip/obec/znak)
+    found      INTEGER NOT NULL DEFAULT 0,  -- existoval veřejný profil (bool)
+    exhausted  INTEGER NOT NULL DEFAULT 0,  -- vyzkoušeny všechny dostupné zdroje
+    fetched_at TEXT NOT NULL        -- UTC timestamp zpracování
+);
 """
 
 
