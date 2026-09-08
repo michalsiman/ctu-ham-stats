@@ -8,6 +8,11 @@ services:
     volumes:
       - ./data:/srv/data
       - ./config.ini:/srv/app/config.ini:ro
+      # Neverzované creds ke callbookům (QRZ/HamQTH/QRZCQ) pro denní dohledávání
+      # okresu. Odkomentuj až soubor config.local.ini na serveru existuje – jinak
+      # by Docker vyrobil místo něj prázdný adresář a start by spadl. Bez creds se
+      # okres úloha stejně nezaregistruje (viz app/main.py), zbytek appky běží.
+      # - ./config.local.ini:/srv/app/config.local.ini:ro
     environment:
       - TZ=Europe/Prague
       # časy stahování dat ČTÚ (data se během dne mění)
