@@ -108,6 +108,35 @@ QRZCQ_XML_URL = os.getenv(
     "QRZCQ_XML_URL", _ini_get("qrzcq", "xml_url", "https://ssl.qrzcq.com/xml")
 )
 
+# --- Denní dohledávání okresu (app.okres) ------------------------------------
+# Aplikace 1x denně (dle plánu) projede callbooky a doplní okres značkám, které
+# ho nemají (paced round-robin fronta dle fetched_at). Vyžaduje QRZ creds –
+# bez nich se job neregistruje. Creds patří do config.local.ini (sekce [qrz]).
+OKRES_LOOKUP_ENABLED = os.getenv(
+    "OKRES_LOOKUP_ENABLED", _ini_get("okres", "enabled", "true")
+).strip().lower() in ("1", "true", "yes", "on")
+
+# Časy spuštění (HH:MM oddělené čárkou) – default brzy ráno, mimo ingest.
+OKRES_LOOKUP_TIMES = os.getenv(
+    "OKRES_LOOKUP_TIMES", _ini_get("okres", "times", "03:30")
+)
+# Dny běhu (APScheduler day_of_week): "*" = denně, nebo např. "mon" = jen pondělí.
+OKRES_LOOKUP_DAYS = os.getenv(
+    "OKRES_LOOKUP_DAYS", _ini_get("okres", "days", "*")
+).strip() or "*"
+
+# Kolik nevyřešených značek zpracovat za jeden běh (velikost dávky fronty).
+OKRES_SLICE = int(os.getenv("OKRES_SLICE", _ini_get("okres", "slice", "150")))
+# Ukládat průběžně po N značkách (odolnost vůči přerušení).
+OKRES_CHUNK = int(os.getenv("OKRES_CHUNK", _ini_get("okres", "chunk", "100")))
+# Pauza mezi dotazy na callbook (throttling), v sekundách.
+OKRES_SLEEP = float(os.getenv("OKRES_SLEEP", _ini_get("okres", "sleep", "0.5")))
+# Bezpečný strop 24h QRZ lookupů – při dosažení se běh gracefully zastaví
+# (chrání účet před odpojením; nezpracované značky se doberou příště).
+OKRES_QRZ_COUNT_STOP = int(
+    os.getenv("OKRES_QRZ_COUNT_STOP", _ini_get("okres", "qrz_count_stop", "7000"))
+)
+
 
 def mcp_allowed_hosts() -> list[str]:
     """Naparsuje MCP_ALLOWED_HOSTS na seznam hostname (bez prázdných položek)."""
@@ -124,3 +153,15 @@ def ingest_times() -> list[tuple[int, int]]:
         hour, _, minute = part.partition(":")
         times.append((int(hour), int(minute or 0)))
     return times or [(6, 0)]
+
+
+def okres_lookup_times() -> list[tuple[int, int]]:
+    """Naparsuje OKRES_LOOKUP_TIMES na seznam (hodina, minuta)."""
+    times: list[tuple[int, int]] = []
+    for part in OKRES_LOOKUP_TIMES.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        hour, _, minute = part.partition(":")
+        times.append((int(hour), int(minute or 0)))
+    return times or [(3, 30)]

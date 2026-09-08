@@ -67,6 +67,20 @@ CREATE TABLE IF NOT EXISTS callsign_okres (
     exhausted  INTEGER NOT NULL DEFAULT 0,  -- vyzkoušeny všechny dostupné zdroje
     fetched_at TEXT NOT NULL        -- UTC timestamp zpracování
 );
+
+-- Odvozený okres+kraj ke značce obohacený o územní kódy (LAU/NUTS/ISO) pro mapu
+-- a agregované počty. Plní se z callsign_okres přes app.region.refresh_region()
+-- (denní job) nebo importem CSV (scripts/import_okres_csv.py). Nezávislá na
+-- callsign_okres – drží jen značky s vyřešeným okresem.
+CREATE TABLE IF NOT EXISTS callsign_region (
+    callsign  TEXT PRIMARY KEY,
+    okres     TEXT NOT NULL,   -- název okresu
+    okres_lau TEXT NOT NULL,   -- LAU kód okresu (CZ0xxx)
+    kraj      TEXT NOT NULL,   -- název kraje
+    kraj_nuts TEXT NOT NULL,   -- NUTS3 kód kraje (CZ0xx)
+    kraj_iso  TEXT NOT NULL    -- ISO 3166-2 kód kraje (CZ-xx)
+);
+CREATE INDEX IF NOT EXISTS idx_callsign_region_kraj ON callsign_region(kraj_iso);
 """
 
 

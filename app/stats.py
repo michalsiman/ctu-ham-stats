@@ -33,6 +33,52 @@ def earliest_snapshot(conn: sqlite3.Connection) -> str | None:
     return row["snapshot_date"] if row else None
 
 
+def geo_counts(conn: sqlite3.Connection) -> dict:
+    """Počty aktuálně platných značek podle okresu a kraje (mapa + přehled).
+
+    Čte z `callsign_region` (obohacené značka→okres→kraj) join přes aktuálně
+    platné značky. Vrací jen okresy/kraje s alespoň jednou dohledanou značkou –
+    nedohledané se nikde nesčítají (číslo dobíhá denním jobem `app.okres`).
+    Okres i kraj jsou kanonické názvy (Praha už sloučená přes `app.kraje`),
+    takže `districts` klíče sedí na `data-district` v mapě.
+    """
+    latest = conn.execute("SELECT MAX(last_seen) AS d FROM callsigns").fetchone()["d"]
+    if not latest:
+        return {"snapshot_date": None, "total_active": 0, "resolved": 0,
+                "districts": {}, "regions": {}}
+
+    total_active = conn.execute(
+        "SELECT COUNT(*) AS n FROM callsigns WHERE last_seen = ?", (latest,)
+    ).fetchone()["n"]
+
+    rows = conn.execute(
+        """
+        SELECT r.okres AS okres, r.kraj AS kraj, COUNT(*) AS pocet
+        FROM callsign_region r
+        JOIN callsigns c ON c.callsign = r.callsign
+        WHERE c.last_seen = ?
+        GROUP BY r.okres, r.kraj
+        """,
+        (latest,),
+    ).fetchall()
+
+    districts: dict[str, int] = {}
+    regions: dict[str, int] = {}
+    resolved = 0
+    for row in rows:
+        districts[row["okres"]] = districts.get(row["okres"], 0) + row["pocet"]
+        regions[row["kraj"]] = regions.get(row["kraj"], 0) + row["pocet"]
+        resolved += row["pocet"]
+
+    return {
+        "snapshot_date": latest,
+        "total_active": total_active,
+        "resolved": resolved,
+        "districts": districts,
+        "regions": regions,
+    }
+
+
 def normalize_suggestion_seed(text: str) -> str:
     """Převede libovolný text na posloupnost velkých písmen A-Z bez diakritiky."""
     normalized = unicodedata.normalize("NFKD", text.upper())
