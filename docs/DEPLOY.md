@@ -190,3 +190,50 @@ docker compose logs ham-stats | grep -i okres
 
 Na webu se v textovém přehledu naplní `.geo-district-val` a mapa se podbarví
 (choropleth), tooltip ukáže počet značek v okrese.
+
+---
+
+## 6. Aktualizace verze na serveru
+
+Kód aplikace (`app/`, `scripts/`) se do image **kopíruje při buildu**, není
+bind-mount. Proto samotný `git pull` novou verzi nenasadí – běžel by dál starý
+image. Po stažení kódu je vždy potřeba **rebuild**:
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+`--build` je nutné – bez něj poběží starý image (např. bez `scripts/` → okres
+úloha padá). `git pull` sám image nepřestaví.
+
+### Co vyžaduje rebuild a co ne
+
+| Změna | Stačí |
+|---|---|
+| `app/`, `scripts/`, `Dockerfile`, `requirements.txt` | `git pull` + `docker compose up -d --build` |
+| `config.ini` | `docker compose restart` (bind-mount, ale čte se při startu) |
+| `config.local.ini`, cokoli v `./data/` | čte se živě; u config stačí `docker compose restart` |
+
+### Pozor na lokální úpravy verzovaných souborů
+
+`config.local.ini` **není v gitu**, takže ho `git pull` nepřinese – nakopíruj ho
+ručně (krok 2). Jakmile kvůli němu odkomentuješ mount v `docker-compose.yml`, je
+to lokální změna verzovaného souboru → příští `git pull` může hlásit konflikt.
+Možnosti:
+
+- nechat to jako lokální změnu a při pullu ji řešit (`git stash` → `git pull` →
+  `git stash pop`), nebo
+- creds předat přes `env_file` mimo `docker-compose.yml` (proměnné
+  `QRZ_USERNAME`/`QRZ_PASSWORD`, `HAMQTH_*`, `QRZCQ_*`) – pak se verzovaný compose
+  nemění a pull je bezkonfliktní.
+
+### Ověření po updatu
+
+```bash
+docker compose ps                         # kontejner běží (Up)
+docker compose logs --tail=50 ham-stats   # bez chyb při startu
+```
+
+Data (`./data/hamstats.db`) i nasbíraná okres-cache rebuild **přežijí** – jsou
+v bind-mountu mimo image.
