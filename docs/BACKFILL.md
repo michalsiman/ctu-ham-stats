@@ -117,9 +117,11 @@ A) nebo B).
 ```bash
 sqlite3 data/hamstats.db \
   "SELECT snapshot_date, unique_callsigns, added, removed FROM daily_stats ORDER BY snapshot_date;"
-# v Dockeru (DB je uvnitř kontejneru na /srv/data):
-# docker compose exec ham-stats sqlite3 /srv/data/hamstats.db \
-#   "SELECT snapshot_date, unique_callsigns, added, removed FROM daily_stats ORDER BY snapshot_date;"
+# V Dockeru image python:3.12-slim nemá sqlite3 CLI – použij Python sqlite3 modul
+# (DB je uvnitř kontejneru na /srv/data):
+# docker compose exec -T ham-stats python -c "import sqlite3; [print(r) for r in \
+#   sqlite3.connect('/srv/data/hamstats.db').execute( \
+#   'SELECT snapshot_date, unique_callsigns, added, removed FROM daily_stats ORDER BY snapshot_date')]"
 ```
 
 Čekej ~4 řádky: `2022-12-15`, `2025-06-06`, `2026-08-28` a dnešní ingest.

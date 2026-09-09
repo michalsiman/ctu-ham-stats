@@ -119,11 +119,13 @@ docker compose exec ham-stats python -m app.backfill_preserve \
 Nejnovější export (např. `28082026`) neposílej – ten už pokrývá živý ingest.
 Varianta pro čistou DB a další detaily jsou v [BACKFILL.md](BACKFILL.md).
 
-Ověření:
+Ověření (image `python:3.12-slim` nemá `sqlite3` CLI ani `curl` – dotazy do DB
+dělej Python `sqlite3` modulem, HTTP volej z hostu):
 
 ```bash
-docker compose exec ham-stats sqlite3 /srv/data/hamstats.db \
-  "SELECT snapshot_date, unique_callsigns, added, removed FROM daily_stats ORDER BY snapshot_date;"
+docker compose exec -T ham-stats python -c "import sqlite3; [print(r) for r in \
+  sqlite3.connect('/srv/data/hamstats.db').execute( \
+  'SELECT snapshot_date, unique_callsigns, added, removed FROM daily_stats ORDER BY snapshot_date')]"
 ```
 
 ---
@@ -137,13 +139,21 @@ job pak jen dobírá nové/nedohledané.
 
 ### 4a. Naseeduj `callsign_okres` z lokální DB
 
-Zkopíruj lokální `data/hamstats.db` na server jako `./data/seed.db`, pak:
+Zkopíruj lokální `data/hamstats.db` na server jako `./data/seed.db`, pak
+(přes Python `sqlite3` modul – CLI `sqlite3` ve slim image není):
 
 ```bash
-docker compose exec ham-stats sqlite3 /srv/data/hamstats.db "
-  ATTACH '/srv/data/seed.db' AS seed;
-  INSERT OR REPLACE INTO callsign_okres SELECT * FROM seed.callsign_okres;
-  DETACH seed;"
+docker compose exec -T ham-stats python - <<'PY'
+import sqlite3
+c = sqlite3.connect('/srv/data/hamstats.db')
+c.execute("ATTACH '/srv/data/seed.db' AS seed")
+c.execute("INSERT OR REPLACE INTO callsign_okres SELECT * FROM seed.callsign_okres")
+c.commit()
+c.execute("DETACH seed")
+print('resolved v DB:', c.execute(
+    "SELECT COUNT(*) FROM callsign_okres WHERE okres IS NOT NULL").fetchone()[0])
+c.close()
+PY
 rm data/seed.db    # rm běží na hostu (mažeš ./data/seed.db)
 ```
 
@@ -154,13 +164,24 @@ znovu nedotazuje.
 > `callsign_region` (mapu), ne `callsign_okres` – fronta by pak dohledávala
 > všechno znovu. Pro server je proto lepší kopie tabulky výše.
 
-### 4b. Promítni cache do mapy
+### 4b. Promítni cache do mapy (bez creds)
 
-Naplní `callsign_region` z `callsign_okres` a udělá i malý sweep nových značek:
+Naplní `callsign_region` z naseedovaného `callsign_okres`. Volej přímo
+`region.refresh_region` – **nepotřebuje callbook creds**, takže mapa je vidět
+hned, i než dořešíš přístupy:
 
 ```bash
-docker compose exec ham-stats curl -s -X POST http://localhost:8000/api/okres
+docker compose exec ham-stats python -c \
+  "from app import db, region; c=db.connect(); print(region.refresh_region(c)); c.close()"
 ```
+
+> `POST /api/okres` dělá totéž **plus** sweep nových značek, ale nejdřív vyžaduje
+> QRZ creds – bez nich vrátí `{"skipped":"no_credentials"}` a mapu nenaplní.
+> Použij ho až po nastavení creds (sekce 2) a zapnutí jobu (4c), a to **z hostu**
+> (v kontejneru `curl` není):
+> ```bash
+> curl -s -X POST http://localhost:8000/api/okres
+> ```
 
 ### 4c. Denní automatika
 
@@ -186,12 +207,20 @@ vypadnou (mapa = cache ∩ aktivní značky), nic se nemaže.
 ## 5. Ověření
 
 ```bash
-# počty pro mapu (jen dohledané aktivní značky)
-docker compose exec ham-stats curl -s http://localhost:8000/api/geo | python -m json.tool | head
+# počty pro mapu (jen dohledané aktivní značky) – curl z hostu (port 127.0.0.1:8000)
+curl -s http://localhost:8000/api/geo | python3 -m json.tool | head
 
 # je okres job naplánovaný? (hledej "Plánovač – okres lookup")
 docker compose logs ham-stats | grep -i okres
 ```
+
+> Kdyby host neměl `curl`, jde `/api/geo` ověřit i Pythonem uvnitř kontejneru:
+> ```bash
+> docker compose exec -T ham-stats python - <<'PY'
+> import urllib.request, json
+> print(json.load(urllib.request.urlopen('http://localhost:8000/api/geo')))
+> PY
+> ```
 
 Na webu se v textovém přehledu naplní `.geo-district-val` a mapa se podbarví
 (choropleth), tooltip ukáže počet značek v okrese.
