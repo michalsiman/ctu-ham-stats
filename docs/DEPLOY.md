@@ -197,15 +197,27 @@ Na webu se v textovém přehledu naplní `.geo-district-val` a mapa se podbarví
 
 Kód aplikace (`app/`, `scripts/`) se do image **kopíruje při buildu**, není
 bind-mount. Proto samotný `git pull` novou verzi nenasadí – běžel by dál starý
-image. Po stažení kódu je vždy potřeba **rebuild**:
+image. Po stažení kódu je vždy potřeba **rebuild**.
+
+Autor na to má skript (`~/update.sh` nebo podobně):
 
 ```bash
+#!/bin/bash
+set -e
+cd ~/ctu-ham-stats
 git pull
 docker compose up -d --build
+docker compose logs --tail 10
 ```
 
 `--build` je nutné – bez něj poběží starý image (např. bez `scripts/` → okres
 úloha padá). `git pull` sám image nepřestaví.
+
+> **Pozor na `set -e` + `git pull`:** když má `git pull` konflikt (typicky kvůli
+> lokálně odkomentovanému mountu `config.local.ini` v `docker-compose.yml`, viz
+> níže), skript kvůli `set -e` **spadne a rebuild neproběhne**. Aby byl pull vždy
+> bezkonfliktní, drž verzovaný `docker-compose.yml` beze změn a creds předávej
+> přes `env_file` (viz níže).
 
 ### Co vyžaduje rebuild a co ne
 
@@ -222,11 +234,12 @@ ručně (krok 2). Jakmile kvůli němu odkomentuješ mount v `docker-compose.yml
 to lokální změna verzovaného souboru → příští `git pull` může hlásit konflikt.
 Možnosti:
 
-- nechat to jako lokální změnu a při pullu ji řešit (`git stash` → `git pull` →
-  `git stash pop`), nebo
-- creds předat přes `env_file` mimo `docker-compose.yml` (proměnné
-  `QRZ_USERNAME`/`QRZ_PASSWORD`, `HAMQTH_*`, `QRZCQ_*`) – pak se verzovaný compose
-  nemění a pull je bezkonfliktní.
+- **doporučeno (kvůli auto-update skriptu):** creds předat přes `env_file` mimo
+  `docker-compose.yml` (proměnné `QRZ_USERNAME`/`QRZ_PASSWORD`, `HAMQTH_*`,
+  `QRZCQ_*`) – verzovaný compose se pak nemění a `git pull` je vždy bezkonfliktní;
+- nebo nechat mount jako lokální změnu a při pullu ji řešit ručně (`git stash` →
+  `git pull` → `git stash pop`) – u `set -e` skriptu ale znamená každý update
+  ruční zásah.
 
 ### Ověření po updatu
 
