@@ -105,10 +105,15 @@ denní CSV) → použij **`app.backfill_preserve`**. Vloží staré snapshoty, o
 `first_seen`, ale živého období (`last_seen`, `added/removed`) se nedotkne;
 před zásahem udělá zálohu DB a je idempotentní.
 
+Bind-mount `./data` je uvnitř kontejneru na **`/srv/data`** (ne `/srv/app/data`),
+takže k souborům v `data/` uváděj v `docker compose exec` **absolutní cestu
+`/srv/data/...`** – modul (`-m app.backfill_preserve`) se importuje z WORKDIRu
+`/srv/app`, ale data leží jinde:
+
 ```bash
 docker compose exec ham-stats python -m app.backfill_preserve \
-    data/backfill/import_radiove_kmitocty_opravneni-122022.csv 2022-12-15 \
-    data/backfill/import_radiove_kmitocty_opravneni06062025.csv 2025-06-06
+    /srv/data/backfill/import_radiove_kmitocty_opravneni-122022.csv 2022-12-15 \
+    /srv/data/backfill/import_radiove_kmitocty_opravneni06062025.csv 2025-06-06
 ```
 
 Nejnovější export (např. `28082026`) neposílej – ten už pokrývá živý ingest.
@@ -117,7 +122,7 @@ Varianta pro čistou DB a další detaily jsou v [BACKFILL.md](BACKFILL.md).
 Ověření:
 
 ```bash
-docker compose exec ham-stats sqlite3 data/hamstats.db \
+docker compose exec ham-stats sqlite3 /srv/data/hamstats.db \
   "SELECT snapshot_date, unique_callsigns, added, removed FROM daily_stats ORDER BY snapshot_date;"
 ```
 
@@ -135,11 +140,11 @@ job pak jen dobírá nové/nedohledané.
 Zkopíruj lokální `data/hamstats.db` na server jako `./data/seed.db`, pak:
 
 ```bash
-docker compose exec ham-stats sqlite3 data/hamstats.db "
-  ATTACH 'data/seed.db' AS seed;
+docker compose exec ham-stats sqlite3 /srv/data/hamstats.db "
+  ATTACH '/srv/data/seed.db' AS seed;
   INSERT OR REPLACE INTO callsign_okres SELECT * FROM seed.callsign_okres;
   DETACH seed;"
-rm data/seed.db
+rm data/seed.db    # rm běží na hostu (mažeš ./data/seed.db)
 ```
 
 Přenese se i stav `fetched_at`/`exhausted`, takže fronta už vyřešené značky

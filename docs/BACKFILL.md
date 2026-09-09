@@ -58,10 +58,13 @@ python -m app.backfill data/backfill/import_radiove_kmitocty_opravneni28082026.c
 python -m app.ingest
 ```
 
-V Dockeru spusť příkazy uvnitř kontejneru (data jsou v bind-mountu `./data`):
+V Dockeru spusť příkazy uvnitř kontejneru. Bind-mount `./data` je namountovaný na
+**`/srv/data`** (ne `/srv/app/data`), takže k CSV uváděj **absolutní cestu
+`/srv/data/...`** – modul (`-m app.backfill`) se importuje z WORKDIRu `/srv/app`,
+ale data leží jinde:
 
 ```bash
-docker compose exec ham-stats python -m app.backfill data/backfill/import_radiove_kmitocty_opravneni-122022.csv 2022-12-15
+docker compose exec ham-stats python -m app.backfill /srv/data/backfill/import_radiove_kmitocty_opravneni-122022.csv 2022-12-15
 # … zbylé dva soubory stejně …
 docker compose exec ham-stats python -m app.ingest
 ```
@@ -89,12 +92,13 @@ python -m app.backfill_preserve \
     data/backfill/import_radiove_kmitocty_opravneni06062025.csv 2025-06-06
 ```
 
-V Dockeru (data jsou v bind-mountu `./data`):
+V Dockeru (bind-mount `./data` je uvnitř kontejneru na **`/srv/data`** – proto
+absolutní cesty k CSV):
 
 ```bash
 docker compose exec ham-stats python -m app.backfill_preserve \
-    data/backfill/import_radiove_kmitocty_opravneni-122022.csv 2022-12-15 \
-    data/backfill/import_radiove_kmitocty_opravneni06062025.csv 2025-06-06
+    /srv/data/backfill/import_radiove_kmitocty_opravneni-122022.csv 2022-12-15 \
+    /srv/data/backfill/import_radiove_kmitocty_opravneni06062025.csv 2025-06-06
 ```
 
 Skript vypíše `daily_stats` PŘED a PO a zálohu uloží jako `hamstats.db.bak-<čas>`.
@@ -113,6 +117,9 @@ A) nebo B).
 ```bash
 sqlite3 data/hamstats.db \
   "SELECT snapshot_date, unique_callsigns, added, removed FROM daily_stats ORDER BY snapshot_date;"
+# v Dockeru (DB je uvnitř kontejneru na /srv/data):
+# docker compose exec ham-stats sqlite3 /srv/data/hamstats.db \
+#   "SELECT snapshot_date, unique_callsigns, added, removed FROM daily_stats ORDER BY snapshot_date;"
 ```
 
 Čekej ~4 řádky: `2022-12-15`, `2025-06-06`, `2026-08-28` a dnešní ingest.
