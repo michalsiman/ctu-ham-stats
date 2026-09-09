@@ -105,20 +105,27 @@ denní CSV) → použij **`app.backfill_preserve`**. Vloží staré snapshoty, o
 `first_seen`, ale živého období (`last_seen`, `added/removed`) se nedotkne;
 před zásahem udělá zálohu DB a je idempotentní.
 
+Bind-mount `./data` je uvnitř kontejneru na **`/srv/data`** (ne `/srv/app/data`),
+takže k souborům v `data/` uváděj v `docker compose exec` **absolutní cestu
+`/srv/data/...`** – modul (`-m app.backfill_preserve`) se importuje z WORKDIRu
+`/srv/app`, ale data leží jinde:
+
 ```bash
 docker compose exec ham-stats python -m app.backfill_preserve \
-    data/backfill/import_radiove_kmitocty_opravneni-122022.csv 2022-12-15 \
-    data/backfill/import_radiove_kmitocty_opravneni06062025.csv 2025-06-06
+    /srv/data/backfill/import_radiove_kmitocty_opravneni-122022.csv 2022-12-15 \
+    /srv/data/backfill/import_radiove_kmitocty_opravneni06062025.csv 2025-06-06
 ```
 
 Nejnovější export (např. `28082026`) neposílej – ten už pokrývá živý ingest.
 Varianta pro čistou DB a další detaily jsou v [BACKFILL.md](BACKFILL.md).
 
-Ověření:
+Ověření (image `python:3.12-slim` nemá `sqlite3` CLI ani `curl` – dotazy do DB
+dělej Python `sqlite3` modulem, HTTP volej z hostu):
 
 ```bash
-docker compose exec ham-stats sqlite3 data/hamstats.db \
-  "SELECT snapshot_date, unique_callsigns, added, removed FROM daily_stats ORDER BY snapshot_date;"
+docker compose exec -T ham-stats python -c "import sqlite3; [print(r) for r in \
+  sqlite3.connect('/srv/data/hamstats.db').execute( \
+  'SELECT snapshot_date, unique_callsigns, added, removed FROM daily_stats ORDER BY snapshot_date')]"
 ```
 
 ---
@@ -132,14 +139,22 @@ job pak jen dobírá nové/nedohledané.
 
 ### 4a. Naseeduj `callsign_okres` z lokální DB
 
-Zkopíruj lokální `data/hamstats.db` na server jako `./data/seed.db`, pak:
+Zkopíruj lokální `data/hamstats.db` na server jako `./data/seed.db`, pak
+(přes Python `sqlite3` modul – CLI `sqlite3` ve slim image není):
 
 ```bash
-docker compose exec ham-stats sqlite3 data/hamstats.db "
-  ATTACH 'data/seed.db' AS seed;
-  INSERT OR REPLACE INTO callsign_okres SELECT * FROM seed.callsign_okres;
-  DETACH seed;"
-rm data/seed.db
+docker compose exec -T ham-stats python - <<'PY'
+import sqlite3
+c = sqlite3.connect('/srv/data/hamstats.db')
+c.execute("ATTACH '/srv/data/seed.db' AS seed")
+c.execute("INSERT OR REPLACE INTO callsign_okres SELECT * FROM seed.callsign_okres")
+c.commit()
+c.execute("DETACH seed")
+print('resolved v DB:', c.execute(
+    "SELECT COUNT(*) FROM callsign_okres WHERE okres IS NOT NULL").fetchone()[0])
+c.close()
+PY
+rm data/seed.db    # rm běží na hostu (mažeš ./data/seed.db)
 ```
 
 Přenese se i stav `fetched_at`/`exhausted`, takže fronta už vyřešené značky
@@ -149,13 +164,24 @@ znovu nedotazuje.
 > `callsign_region` (mapu), ne `callsign_okres` – fronta by pak dohledávala
 > všechno znovu. Pro server je proto lepší kopie tabulky výše.
 
-### 4b. Promítni cache do mapy
+### 4b. Promítni cache do mapy (bez creds)
 
-Naplní `callsign_region` z `callsign_okres` a udělá i malý sweep nových značek:
+Naplní `callsign_region` z naseedovaného `callsign_okres`. Volej přímo
+`region.refresh_region` – **nepotřebuje callbook creds**, takže mapa je vidět
+hned, i než dořešíš přístupy:
 
 ```bash
-docker compose exec ham-stats curl -s -X POST http://localhost:8000/api/okres
+docker compose exec ham-stats python -c \
+  "from app import db, region; c=db.connect(); print(region.refresh_region(c)); c.close()"
 ```
+
+> `POST /api/okres` dělá totéž **plus** sweep nových značek, ale nejdřív vyžaduje
+> QRZ creds – bez nich vrátí `{"skipped":"no_credentials"}` a mapu nenaplní.
+> Použij ho až po nastavení creds (sekce 2) a zapnutí jobu (4c), a to **z hostu**
+> (v kontejneru `curl` není):
+> ```bash
+> curl -s -X POST http://localhost:8000/api/okres
+> ```
 
 ### 4c. Denní automatika
 
@@ -181,12 +207,80 @@ vypadnou (mapa = cache ∩ aktivní značky), nic se nemaže.
 ## 5. Ověření
 
 ```bash
-# počty pro mapu (jen dohledané aktivní značky)
-docker compose exec ham-stats curl -s http://localhost:8000/api/geo | python -m json.tool | head
+# počty pro mapu (jen dohledané aktivní značky) – curl z hostu (port 127.0.0.1:8000)
+curl -s http://localhost:8000/api/geo | python3 -m json.tool | head
 
 # je okres job naplánovaný? (hledej "Plánovač – okres lookup")
 docker compose logs ham-stats | grep -i okres
 ```
 
+> Kdyby host neměl `curl`, jde `/api/geo` ověřit i Pythonem uvnitř kontejneru:
+> ```bash
+> docker compose exec -T ham-stats python - <<'PY'
+> import urllib.request, json
+> print(json.load(urllib.request.urlopen('http://localhost:8000/api/geo')))
+> PY
+> ```
+
 Na webu se v textovém přehledu naplní `.geo-district-val` a mapa se podbarví
 (choropleth), tooltip ukáže počet značek v okrese.
+
+---
+
+## 6. Aktualizace verze na serveru
+
+Kód aplikace (`app/`, `scripts/`) se do image **kopíruje při buildu**, není
+bind-mount. Proto samotný `git pull` novou verzi nenasadí – běžel by dál starý
+image. Po stažení kódu je vždy potřeba **rebuild**.
+
+Autor na to má skript (`~/update.sh` nebo podobně):
+
+```bash
+#!/bin/bash
+set -e
+cd ~/ctu-ham-stats
+git pull
+docker compose up -d --build
+docker compose logs --tail 10
+```
+
+`--build` je nutné – bez něj poběží starý image (např. bez `scripts/` → okres
+úloha padá). `git pull` sám image nepřestaví.
+
+> **Pozor na `set -e` + `git pull`:** když má `git pull` konflikt (typicky kvůli
+> lokálně odkomentovanému mountu `config.local.ini` v `docker-compose.yml`, viz
+> níže), skript kvůli `set -e` **spadne a rebuild neproběhne**. Aby byl pull vždy
+> bezkonfliktní, drž verzovaný `docker-compose.yml` beze změn a creds předávej
+> přes `env_file` (viz níže).
+
+### Co vyžaduje rebuild a co ne
+
+| Změna | Stačí |
+|---|---|
+| `app/`, `scripts/`, `Dockerfile`, `requirements.txt` | `git pull` + `docker compose up -d --build` |
+| `config.ini` | `docker compose restart` (bind-mount, ale čte se při startu) |
+| `config.local.ini`, cokoli v `./data/` | čte se živě; u config stačí `docker compose restart` |
+
+### Pozor na lokální úpravy verzovaných souborů
+
+`config.local.ini` **není v gitu**, takže ho `git pull` nepřinese – nakopíruj ho
+ručně (krok 2). Jakmile kvůli němu odkomentuješ mount v `docker-compose.yml`, je
+to lokální změna verzovaného souboru → příští `git pull` může hlásit konflikt.
+Možnosti:
+
+- **doporučeno (kvůli auto-update skriptu):** creds předat přes `env_file` mimo
+  `docker-compose.yml` (proměnné `QRZ_USERNAME`/`QRZ_PASSWORD`, `HAMQTH_*`,
+  `QRZCQ_*`) – verzovaný compose se pak nemění a `git pull` je vždy bezkonfliktní;
+- nebo nechat mount jako lokální změnu a při pullu ji řešit ručně (`git stash` →
+  `git pull` → `git stash pop`) – u `set -e` skriptu ale znamená každý update
+  ruční zásah.
+
+### Ověření po updatu
+
+```bash
+docker compose ps                         # kontejner běží (Up)
+docker compose logs --tail=50 ham-stats   # bez chyb při startu
+```
+
+Data (`./data/hamstats.db`) i nasbíraná okres-cache rebuild **přežijí** – jsou
+v bind-mountu mimo image.
